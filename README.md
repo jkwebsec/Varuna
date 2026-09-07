@@ -4,7 +4,7 @@
 risk verdicts + a per-video Authenticity Score — bot-text classifier, account-farm
 heuristics, scam regexes, and coordination detection fused in one decision ladder.
 
-Live site (GitHub Pages): `https://<your-username>.github.io/yt-authentic/`
+Live site (GitHub Pages): `https://jkwebsec.github.io/Varuna/`
 
 ## Run it (2 commands)
 
