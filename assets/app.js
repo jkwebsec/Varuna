@@ -180,6 +180,7 @@ BOOKS.forEach(function (book, index) {
   button.style.setProperty("--i", String(index));
   button.style.setProperty("--col", String(index % 5));
   button.style.setProperty("--row", String(Math.floor(index / 5)));
+  button.style.setProperty("--depth", String(index / Math.max(BOOKS.length - 1, 1)));
   button.innerHTML =
     '<span class="cover-top">' + esc(book.top) + '</span>' +
     '<strong>' + esc(book.title) + '</strong>' +
@@ -217,6 +218,32 @@ function sizeTraditionalView() {
   var wByWidth = artRect.width * 0.43 / hDenom;
   var w = Math.max(70, Math.min(wByHeight, wByWidth, 620));
   stack.style.setProperty("--trad-w", w + "px");
+  stack.style.setProperty("--trad-cols", String(cols));
+  stack.style.setProperty("--trad-rows", String(rows));
+}
+
+/* ---- stacked view: scale the perspective cascade to the panel and center
+   the whole fanned block (not just its first card) inside it. Same shape as
+   the reference's per-card translate3d/rotate, but the step size shrinks on
+   narrow panels instead of overflowing, and the container shift is solved
+   from the actual step so the cascade's midpoint — not its first card —
+   lands on the panel's center. */
+function sizeStackedView() {
+  if (currentView !== "stacked") return;
+  var n = BOOKS.length;
+  var artRect = archiveArt.getBoundingClientRect();
+  var cardRect = stack.getBoundingClientRect();
+  if (!artRect.width || !cardRect.width) return;
+  var budget = artRect.width * 0.3;
+  var stepX = Math.max(4, Math.min(14, budget / Math.max(n - 1, 1)));
+  var ratio = stepX / 14;
+  var stepY = 7 * ratio;
+  var stepZ = 10 * ratio;
+  stack.style.setProperty("--stack-step-x", stepX + "px");
+  stack.style.setProperty("--stack-step-y", "-" + stepY + "px");
+  stack.style.setProperty("--stack-step-z", stepZ + "px");
+  stack.style.setProperty("--stack-shift-x", ((n - 1) * stepX / 2) + "px");
+  stack.style.setProperty("--stack-shift-y", ((n - 1) * stepY / 2) + "px");
 }
 
 /* ---- globe view: scale the arc's spread to the panel, not a fixed viewport.
@@ -323,10 +350,12 @@ document.querySelectorAll(".view-button").forEach(function (button) {
     }
     if (view === "traditional") sizeTraditionalView();
     if (view === "globe") sizeGlobeView();
+    if (view === "stacked") sizeStackedView();
   });
 });
 
-window.addEventListener("resize", function () { sizeTraditionalView(); sizeGlobeView(); }, { passive: true });
+window.addEventListener("resize", function () { sizeTraditionalView(); sizeGlobeView(); sizeStackedView(); }, { passive: true });
+sizeStackedView();
 
 /* ---- pointer parallax — fine pointers only, never on touch/coarse ------ */
 archiveArt.addEventListener("pointermove", function (event) {

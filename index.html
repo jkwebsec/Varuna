@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#f3f3f1">
-<title>yt-authentic — YouTube Comment Integrity Analyzer</title>
+<title>Varuna — YouTube Comment Integrity Analyzer</title>
 <meta name="description" content="Paste a YouTube URL. Get an integrity report: bot probability, scam patterns, account-farm risk, coordination detection. LightGBM + regex + YouTube Data API v3.">
 <link rel="stylesheet" href="assets/style.css">
 </head>
@@ -12,7 +12,7 @@
 
 <nav>
   <div class="nav-inner">
-    <span class="logo">yt-authentic<span class="tick">_</span></span>
+    <span class="logo">Varuna<span class="tick">_</span></span>
     <div class="nav-links">
       <a href="#overview">overview</a>
       <a href="#architecture">architecture</a>
@@ -32,7 +32,7 @@
 
   <div class="archive-frame" id="archiveFrame">
     <div class="archive-intro">
-      <div class="wordmark">yt-authentic<span class="tick">_</span></div>
+      <div class="wordmark">Varuna<span class="tick">_</span></div>
       <span class="rail-kicker">One URL in · integrity report out</span>
       <p>Paste any YouTube link and get a per-comment <i>Low / Medium / High</i> risk verdict plus a
       per-video Authenticity Score — bot-text classifier, account-farm heuristics, scam regexes and
@@ -63,7 +63,7 @@
   </div>
 
   <div class="stage-bottomline">
-    <span>© 2026 · yt-authentic</span>
+    <span>© 2026 · Varuna</span>
     <span>Scroll for the method</span>
   </div>
 </div>
@@ -305,7 +305,7 @@ decide(): hard_scam → High 0.90
   <div class="transcript reveal">
     <div class="transcript-head">
       <span class="mark f"></span><span class="mark"></span><span class="mark"></span>
-      <span class="transcript-title">zsh — yt-authentic</span>
+      <span class="transcript-title">zsh — Varuna</span>
     </div>
     <div class="transcript-body">
 <span class="prompt">$</span> <span class="cmd">export YOUTUBE_API_KEY="AIza..."</span><br>
@@ -376,7 +376,7 @@ decide(): hard_scam → High 0.90
       <div class="codeblock">
         <div class="cb-head"><span>bash</span><button class="copy-btn" type="button">copy</button></div>
         <pre><code>git clone https://github.com/jkwebsec/Varuna.git
-cd yt-authentic
+cd Varuna
 python -m venv .venv
 source .venv/bin/activate          <span class="c"># Windows: .venv\Scripts\activate</span>
 pip install -r requirements.txt</code></pre>
@@ -422,7 +422,7 @@ $env:YOUTUBE_API_KEY="AIza..."</code></pre>
       LightGBM on your labeled dataset. It dumps two files — put them next to <code>app.py</code>:</p>
       <div class="codeblock">
         <div class="cb-head"><span>filesystem</span><button class="copy-btn" type="button">copy</button></div>
-        <pre><code>yt-authentic/
+        <pre><code>Varuna/
 ├── app.py
 ├── bot_text_model_v2.pkl       <span class="c"># LightGBM</span>
 └── tfidf_vectorizer_v2.pkl     <span class="c"># TF-IDF (10k, 1-2 ngrams)</span></code></pre>
@@ -448,8 +448,8 @@ $env:YOUTUBE_API_KEY="AIza..."</code></pre>
       <h3>Publish this page</h3>
       <div class="codeblock">
         <div class="cb-head"><span>bash</span><button class="copy-btn" type="button">copy</button></div>
-        <pre><code>cd yt-authentic
-git init &amp;&amp; git add . &amp;&amp; git commit -m "yt-authentic: site + app"
+        <pre><code>cd Varuna
+git init &amp;&amp; git add . &amp;&amp; git commit -m "Varuna: site + app"
 git branch -M main
 git remote add origin https://github.com/jkwebsec/Varuna.git
 git push -u origin main</code></pre>
@@ -489,7 +489,7 @@ git push -u origin main</code></pre>
     <span class="badge"><b>regex</b> heuristics</span>
   </div>
   <p class="foot-note">
-    yt-authentic — paste a URL, get the truth.&nbsp;·&nbsp;
+    Varuna — paste a URL, get the truth.&nbsp;·&nbsp;
     <a href="https://github.com/jkwebsec/Varuna" rel="noreferrer" target="_blank">source</a> &nbsp;·&nbsp;
     <a href="notebook/yt-authentic-1-2v.ipynb" download>notebook</a> &nbsp;·&nbsp;
     <a href="#replicate">replicate</a>

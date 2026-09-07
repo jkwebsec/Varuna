@@ -182,7 +182,8 @@ nav.is-stuck { transform: none; }
    ========================================================================= */
 .cover-stack {
   position: absolute; width: min(28%, 186px); aspect-ratio: .69;
-  top: 46%; left: 50%; transform: translate(-20%, -50%) rotate(-5deg);
+  top: 50%; left: 50%;
+  transform: translate(calc(-50% - var(--stack-shift-x, 39px)), calc(-50% + var(--stack-shift-y, 20px))) rotate(-5deg);
   transition: transform .8s cubic-bezier(.2,.8,.2,1), width .5s, aspect-ratio .5s;
   transform-style: preserve-3d;
 }
@@ -191,15 +192,16 @@ nav.is-stuck { transform: none; }
   padding: 11px 10px 12px; display: flex; flex-direction: column; justify-content: space-between;
   border: 1px solid var(--rule);
   box-shadow: -2px 2px 0 var(--rule), 7px 8px 13px rgba(0,0,0,.13);
-  transform: translate3d(calc(var(--i) * 6px), calc(var(--i) * -3px), calc(var(--i) * 4px)) rotate(calc(var(--i) * .15deg));
+  transform: translate3d(calc(var(--i) * var(--stack-step-x, 14px)), calc(var(--i) * var(--stack-step-y, -7px)), calc(var(--i) * var(--stack-step-z, 10px))) rotate(calc(var(--i) * .6deg)) scale(calc(.88 + var(--depth, 0) * .12));
   transform-origin: bottom left;
-  transition: transform .45s cubic-bezier(.2,.8,.2,1), filter .45s;
+  opacity: calc(.6 + var(--depth, 0) * .4);
+  transition: transform .45s cubic-bezier(.2,.8,.2,1), filter .45s, opacity .45s;
   text-align: left;
 }
 @media (hover: hover) and (pointer: fine) {
   .magazine-cover:hover {
-    transform: translate3d(calc(var(--i) * 6px), -18px, 25px) rotate(-2deg);
-    z-index: 20; filter: saturate(1.13);
+    transform: translate3d(calc(var(--i) * var(--stack-step-x, 14px)), calc(var(--i) * var(--stack-step-y, -7px) - 20px), calc(var(--i) * var(--stack-step-z, 10px) + 30px)) rotate(-2deg) scale(1.06);
+    z-index: 20; filter: saturate(1.15); opacity: 1;
   }
 }
 .cover-top, .cover-mark { font-family: var(--serif); font-size: 8px; letter-spacing: .08em; }
@@ -228,7 +230,7 @@ nav.is-stuck { transform: none; }
 .palette-red    { color: #f4ebd7; background: #a43c34; }
 
 /* ---------- view: globe ---------- */
-#archiveArt[data-view='globe'] .cover-stack { transform: translate(-23%, -50%) rotate(-8deg) scale(.95); }
+#archiveArt[data-view='globe'] .cover-stack { transform: translate(-50%, -50%) rotate(-8deg) scale(.95); }
 #archiveArt[data-view='globe'] .magazine-cover {
   transform: translate3d(calc((var(--i) - var(--center, 4)) * var(--globe-step, 33px)), calc(sin(var(--i)) * var(--globe-amp, 45px)), calc(var(--i) * var(--globe-z, 3px))) rotate(calc((var(--i) - var(--center, 4)) * var(--globe-rot, 7deg)));
 }
@@ -237,7 +239,8 @@ nav.is-stuck { transform: none; }
 
 /* ---------- view: traditional ---------- */
 #archiveArt[data-view='traditional'] .cover-stack {
-  width: var(--trad-w, min(66%, 450px)); top: 50%; left: 53%; transform: translate(-50%, -50%) rotate(0);
+  width: var(--trad-w, min(66%, 450px)); top: 50%; left: 50%;
+  transform: translate(calc(-50% - (var(--trad-cols, 1) - 1) * 11.5%), calc(-50% - (var(--trad-rows, 1) - 1) * 57.5%)) rotate(0);
 }
 #archiveArt[data-view='traditional'] .magazine-cover {
   transform: translate3d(calc((var(--col)) * 23%), calc((var(--row)) * 115%), 0) rotate(0);
@@ -511,11 +514,11 @@ footer { margin-top: 24px; padding: 42px clamp(20px, 4vw, 70px) 54px; border-top
   .view-button { justify-content: center; height: 32px; padding: 0 4px; font-size: 0; }
   .view-button .view-icon { width: auto; font-size: 15px; }
   .archive-art { height: 570px; }
-  .cover-stack { width: 32%; min-width: 118px; top: 47%; left: 52%; }
+  .cover-stack { width: 32%; min-width: 118px; top: 50%; left: 50%; }
   /* the 118px floor above is for the stacked/globe fan only — traditional's
      width is solved dynamically per viewport/book-count in JS and must not
      be clamped upward, or extra rows push back off the bottom of the panel */
-  #archiveArt[data-view='traditional'] .cover-stack { width: var(--trad-w, min(66%, 450px)); min-width: 0; top: 50%; left: 53%; }
+  #archiveArt[data-view='traditional'] .cover-stack { width: var(--trad-w, min(66%, 450px)); min-width: 0; top: 50%; left: 50%; }
   .expanded-card { inset: 24% 5% 12%; gap: 16px; padding: 18px; }
   .expanded-cover { flex-basis: 40%; padding: 9px 8px; }
   .expanded-copy h2 { font-size: 42px; }

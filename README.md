@@ -1,4 +1,4 @@
-# yt-authentic
+# Varuna
 
 **Paste a YouTube URL. Get an integrity report.** Per-comment `Low / Medium / High`
 risk verdicts + a per-video Authenticity Score — bot-text classifier, account-farm
