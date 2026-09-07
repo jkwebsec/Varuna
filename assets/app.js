@@ -155,7 +155,7 @@ var VIEW_LABELS = { globe: "Globe perspective", stacked: "Stacked perspective", 
    live / embed, tracking params like ?si= are fine) and the screening
    section rebuilds itself: poster, caption, and embed all follow.
    ========================================================================= */
-var DEMO_VIDEO_URL = "https://youtu.be/3cqu_xnuPnw?si=eUsJQIpTZJwG_jdP";
+var DEMO_VIDEO_URL = "https://youtu.be/lJBcZHzgD7s?si=Ihdq7zJrdDsPh4aP";
 
 
 function esc(s) {
