@@ -1,233 +1,348 @@
 /* =========================================================================
-   yt-authentic — stage deck + page behaviours
+   yt-authentic — archive stage (Globe / Stacked / Traditional, unchanged)
+   + page behaviours (copy, scrollspy, reveal)
    ========================================================================= */
 
-/* ---- specimen deck data -------------------------------------------------
-   Ten comments run through the real decide() ladder in app.py. Ordered by
-   the rung that fired, so the "ladder" perspective reads top-to-bottom.
-   ------------------------------------------------------------------------ */
-var SPECIMENS = [
+/* ---- backend content, one "cover" per pipeline component or decide() rung.
+   All facts/thresholds are copied verbatim from app.py's score_comments()/
+   decide() and the Scoring Engine section above. */
+var BOOKS = [
   {
-    verdict: "High", pal: "high", score: 0.90, rule: 1,
-    ruleLabel: "Hard scam",
-    reason: "Hard scam/contact pattern",
-    text: "Lost crypto? I got all of mine back in 48 hours. Free recovery, no upfront fee — join the signal group on telegram @vault_recovery_desk",
-    author: "@CryptoRecovery_Desk", meta: "top-level · 0 likes",
-    signals: { text: 0.94, account: 0.30, spam: 0.50, coord: 0.00 }
+    id: "fetch", kind: "component", palette: "cream",
+    top: "01", title: "Comment Fetch", figure: "▤", mark: "YOUTUBE DATA API V3",
+    kicker: "Backend · pipeline stage 1 of 6", headline: "100/req", tag: "component", tagLabel: "backend component",
+    description: "commentThreads.list paginates 100 comments per request with a 50ms sleep between pages, walking nextPageToken until max_comments is hit. Replies are fetched inline and flagged is_reply so account-farm stats can separate top-level comments from replies.",
+    facts: [
+      "commentsDisabled → clear error, never a stack trace",
+      "videoNotFound → clear error",
+      "quota exhausted → “try later”, the run stops cleanly"
+    ]
   },
   {
-    verdict: "High", pal: "high", score: 0.90, rule: 1,
-    ruleLabel: "Hard scam",
-    reason: "Hard scam/contact pattern",
-    text: "Thanks pal 𝟫𝟪𝟩𝟨𝟧𝟦𝟥𝟤𝟣𝟢 whatsapp me for the daily setups, 100% accurate",
-    author: "@TradeSignals_Pro", meta: "reply · 1 like",
-    signals: { text: 0.88, account: 0.35, spam: 0.50, coord: 0.20 }
+    id: "classifier", kind: "component", palette: "blue",
+    top: "02", title: "Bot Classifier", figure: "✦", mark: "LIGHTGBM + TF-IDF",
+    kicker: "Backend · pipeline stage 2 of 6", headline: "10K", tag: "component", tagLabel: "backend component",
+    description: "A LightGBM binary classifier scores every comment's text alone: TF-IDF over 1–2 word ngrams, 10,000 features, min_df=2. 400 trees, learning rate 0.05, 48 leaves, class_weight=\"balanced\" to counter the natural genuine/bot imbalance in the training set.",
+    facts: [
+      "output = text_bot_prob, a single probability in [0, 1]",
+      "no model on disk → HAS_MODEL=False, heuristic-only mode kicks in automatically",
+      "never the sole decider — always fused with structural signals in decide()"
+    ]
   },
   {
-    verdict: "High", pal: "high", score: 0.85, rule: 2,
-    ruleLabel: "Account farm",
-    reason: "Strong account farm risk",
-    text: "Nice video bro keep it up 🔥",
-    author: "@user_9931204", meta: "14 comments here · unique-text ratio 0.21",
-    signals: { text: 0.41, account: 0.65, spam: 0.00, coord: 0.20 }
+    id: "account", kind: "component", palette: "orange",
+    top: "03", title: "Account Farm", figure: "◉", mark: "ACCOUNT_RISK_SCORE",
+    kicker: "Backend · pipeline stage 3 of 6", headline: "1.00", tag: "component", tagLabel: "backend component",
+    description: "Every comment's author_channel_id is aggregated across the fetched set: total comment volume, distinct videos commented on, and the ratio of unique text to total comments. The four conditions stack — a repeat poster who copy-pastes across multiple videos can hit the 1.0 cap easily.",
+    facts: [
+      "videos_commented ≥ 3 → +0.40 · == 2 → +0.20",
+      "total_comments ≥ 10 → +0.25 · ≥ 5 → +0.15",
+      "unique_text_ratio ≤ 0.40 → +0.25 · ≤ 0.70 → +0.10",
+      "url_ratio ≥ 0.40 → +0.20"
+    ]
   },
   {
-    verdict: "Low", pal: "low", score: 0.05, rule: 3,
-    ruleLabel: "Too short to judge",
-    reason: "Short comment with no scam signal",
-    text: "first 🔥🔥",
-    author: "@notifsquad", meta: "top-level · 212 likes",
-    signals: { text: 0.52, account: 0.00, spam: 0.00, coord: 0.00 }
+    id: "scam", kind: "component", palette: "coral",
+    top: "04", title: "Scam Regex", figure: "✷", mark: "SPAM_PATTERN_SCORE",
+    kicker: "Backend · pipeline stage 4 of 6", headline: "0.50", tag: "component", tagLabel: "backend component",
+    description: "A regex battery scans the raw comment text for the classic YouTube scam surface — payment-app handles, contact bait, and a Unicode-bold-digit evasion trick (𝟣𝟤𝟥…) scammers use to slip a phone number past plain-text filters. Capped at 0.50: a strong signal, never the whole verdict.",
+    facts: [
+      "link → +0.20 (http, www., t.me, wa.me, bit.ly, tinyurl)",
+      "contact bait → +0.30 (whatsapp, telegram, dm me, inbox me, contact me, free recovery, lost crypto, signal group)",
+      "unicode evasion → +0.30 (bold digits + a contact word together)"
+    ],
+    code: ["free recovery", "lost crypto", "signal group", "guaranteed profit", "whatsapp", "telegram", "t.me", "wa.me", "bit.ly", "tinyurl", "“dm me”", "“inbox me”"]
   },
   {
-    verdict: "High", pal: "high", score: 0.75, rule: 4,
-    ruleLabel: "Text + support",
-    reason: "Strong text suspicion + support",
-    text: "Best video on this topic!! Everyone should watch this, amazing content, keep going, already subscribed!!!",
-    author: "@growth_engine_yt", meta: "6 comments here · unique-text ratio 0.33",
-    signals: { text: 0.93, account: 0.35, spam: 0.00, coord: 0.00 }
+    id: "coord", kind: "component", palette: "pink",
+    top: "05", title: "Coordination", figure: "✳", mark: "COORDINATION_SCORE",
+    kicker: "Backend · pipeline stage 5 of 6", headline: "0.20", tag: "component", tagLabel: "backend component",
+    description: "Comment text is normalized — lowercased, whitespace-collapsed, punctuation stripped — then grouped. If the same normalized text appears from 2 or more distinct accounts, 2 or more times, every one of those comments is flagged as a coordinated brigade.",
+    facts: [
+      "fixed score: +0.20, no partial credit",
+      "needs ≥30 characters of normalized text — short phrases like “nice video” are noise, not signal",
+      "catches copy-paste brigades across sockpuppet accounts"
+    ]
   },
   {
-    verdict: "Medium", pal: "med", score: 0.45, rule: 5,
-    ruleLabel: "Text suspicion",
-    reason: "Text suspicion",
-    text: "Wow such an informative video, thank you so much for sharing this valuable knowledge with us",
-    author: "@shreya.k", meta: "top-level · 3 likes",
-    signals: { text: 0.71, account: 0.20, spam: 0.00, coord: 0.00 }
+    id: "report", kind: "component", palette: "green",
+    top: "06", title: "Integrity Report", figure: "▥", mark: "MARKDOWN + CHART + TOP-15",
+    kicker: "Backend · pipeline stage 6 of 6", headline: "/100", tag: "component", tagLabel: "backend component",
+    description: "Every scored comment gets a final_risk_level, a final_risk_score, and a final_reasons string. Rolled up per video: an Authenticity Score out of 100, a risk distribution chart, and the top-15 most suspicious comments — the full scored DataFrame is downloadable.",
+    facts: [
+      "authenticity = (low·1 + medium·0.5 + high·0) ÷ total × 100",
+      "video risk: Low ≥85 · Medium ≥60 · High otherwise",
+      "the same formula this page's terminal demo runs live"
+    ]
   },
   {
-    verdict: "Medium", pal: "med", score: 0.35, rule: 6,
-    ruleLabel: "Structural",
-    reason: "Structural signals",
-    text: "Great breakdown. contact me if you want the spreadsheet I built from this",
-    author: "@arjun_builds", meta: "top-level · 8 likes",
-    signals: { text: 0.38, account: 0.10, spam: 0.30, coord: 0.00 }
+    id: "rule1", kind: "rule", palette: "red",
+    top: "R1", title: "Hard Scam", figure: "⚠", mark: "HIGH · 0.90",
+    kicker: "decide() · rule 1 of 7", headline: "0.90", tag: "high", tagLabel: "final_risk_level",
+    description: "Rule 1 of 7 — first match wins. hard_scam==1 fires on free recovery / lost crypto / signal group / guaranteed profit, on whatsapp/telegram/t.me/wa.me/bit.ly/tinyurl, on “dm me”/“inbox me”, or on “contact me” plus context. It short-circuits every other signal.",
+    quote: "Lost crypto? I got all of mine back in 48 hours. Free recovery, no upfront fee — join the signal group on telegram @vault_recovery_desk",
+    meta: "@CryptoRecovery_Desk · top-level · 0 likes",
+    signals: { text_bot_prob: 0.94, account_risk_score: 0.30, spam_pattern_score: 0.50, coordination_score: 0.00 },
+    reason: "Hard scam/contact pattern"
   },
   {
-    verdict: "Medium", pal: "med", score: 0.35, rule: 6,
-    ruleLabel: "Structural",
-    reason: "Structural signals",
-    text: "Bhai R2h walo ko bulao ❤️ please bulao unko",
-    author: "@r2h_army_fan", meta: "9 identical posts · 4 accounts",
-    signals: { text: 0.44, account: 0.50, spam: 0.00, coord: 0.20 }
+    id: "rule2", kind: "rule", palette: "navy",
+    top: "R2", title: "Account Farm", figure: "◉", mark: "HIGH · 0.85",
+    kicker: "decide() · rule 2 of 7", headline: "0.85", tag: "high", tagLabel: "final_risk_level",
+    description: "Rule 2 — a bland, harmless-looking comment still goes High when account_risk_score ≥ 0.60. The text alone is never suspicious here; the account's volume and copy-paste ratio are what convict it.",
+    quote: "Nice video bro keep it up 🔥",
+    meta: "@user_9931204 · 14 comments here · unique-text ratio 0.21",
+    signals: { text_bot_prob: 0.41, account_risk_score: 0.65, spam_pattern_score: 0.00, coordination_score: 0.20 },
+    reason: "Strong account farm risk"
   },
   {
-    verdict: "Low", pal: "low", score: 0.05, rule: 7,
-    ruleLabel: "No evidence",
-    reason: "No strong bot evidence",
-    text: "The part at 12:40 about TF-IDF finally made ngrams click for me. I had been treating min_df as a noise knob when it is really a vocabulary budget.",
-    author: "@meera.builds", meta: "top-level · 47 likes",
-    signals: { text: 0.11, account: 0.00, spam: 0.00, coord: 0.00 }
+    id: "rule3", kind: "rule", palette: "mint",
+    top: "R3", title: "Too Short", figure: "●", mark: "LOW · 0.05",
+    kicker: "decide() · rule 3 of 7", headline: "0.05", tag: "low", tagLabel: "final_risk_level",
+    description: "Rule 3 — under 20 characters with no scam flag is Low by default, no matter what the text classifier guesses. Short comments don't carry enough signal to convict.",
+    quote: "first 🔥🔥",
+    meta: "@notifsquad · top-level · 212 likes",
+    signals: { text_bot_prob: 0.52, account_risk_score: 0.00, spam_pattern_score: 0.00, coordination_score: 0.00 },
+    reason: "Short comment with no scam signal"
   },
   {
-    verdict: "Low", pal: "low", score: 0.05, rule: 7,
-    ruleLabel: "No evidence",
-    reason: "No strong bot evidence",
-    text: "Source for the claim at 12:40: https://arxiv.org/abs/1802.09477 — the appendix has the ablation he is describing.",
-    author: "@dev_null_", meta: "reply · 12 likes",
-    signals: { text: 0.19, account: 0.00, spam: 0.20, coord: 0.00 }
+    id: "rule4", kind: "rule", palette: "red",
+    top: "R4", title: "Text + Support", figure: "✷", mark: "HIGH · 0.75",
+    kicker: "decide() · rule 4 of 7", headline: "0.75", tag: "high", tagLabel: "final_risk_level",
+    description: "Rule 4 — the classifier alone isn't enough. Strong suspicion (p ≥ 0.85) only escalates to High when a support signal backs it up: spam_pattern_score ≥ 0.20 or account_risk_score ≥ 0.30.",
+    quote: "Best video on this topic!! Everyone should watch this, amazing content, keep going, already subscribed!!!",
+    meta: "@growth_engine_yt · 6 comments here · unique-text ratio 0.33",
+    signals: { text_bot_prob: 0.93, account_risk_score: 0.35, spam_pattern_score: 0.00, coordination_score: 0.00 },
+    reason: "Strong text suspicion + support"
+  },
+  {
+    id: "rule5", kind: "rule", palette: "yellow",
+    top: "R5", title: "Text Suspicion", figure: "✧", mark: "MEDIUM · 0.45",
+    kicker: "decide() · rule 5 of 7", headline: "0.45", tag: "med", tagLabel: "final_risk_level",
+    description: "Rule 5 — moderate-to-strong text suspicion with no support signal lands at Medium, not High. The model isn't certain enough on its own to convict.",
+    quote: "Wow such an informative video, thank you so much for sharing this valuable knowledge with us",
+    meta: "@shreya.k · top-level · 3 likes",
+    signals: { text_bot_prob: 0.71, account_risk_score: 0.20, spam_pattern_score: 0.00, coordination_score: 0.00 },
+    reason: "Text suspicion"
+  },
+  {
+    id: "rule6", kind: "rule", palette: "yellow",
+    top: "R6", title: "Structural", figure: "✹", mark: "MEDIUM · 0.35",
+    kicker: "decide() · rule 6 of 7", headline: "0.35", tag: "med", tagLabel: "final_risk_level",
+    description: "Rule 6 — the text classifier is unconvinced, but spam_pattern_score ≥ 0.30 or account_risk_score ≥ 0.45 alone is enough for Medium. Structure can convict even when the wording looks innocent.",
+    quote: "Bhai R2h walo ko bulao ❤️ please bulao unko",
+    meta: "9 identical posts · 4 accounts",
+    signals: { text_bot_prob: 0.44, account_risk_score: 0.50, spam_pattern_score: 0.00, coordination_score: 0.20 },
+    reason: "Structural signals"
+  },
+  {
+    id: "rule7", kind: "rule", palette: "mint",
+    top: "R7", title: "No Evidence", figure: "◆", mark: "LOW · 0.05",
+    kicker: "decide() · rule 7 of 7", headline: "0.05", tag: "low", tagLabel: "final_risk_level",
+    description: "Rule 7 — the fallback. Every prior rung failed to fire, so the comment is Low by default. This is where genuine conversation lives.",
+    quote: "The part at 12:40 about TF-IDF finally made ngrams click for me. I had been treating min_df as a noise knob when it is really a vocabulary budget.",
+    meta: "@meera.builds · top-level · 47 likes",
+    signals: { text_bot_prob: 0.11, account_risk_score: 0.00, spam_pattern_score: 0.00, coordination_score: 0.00 },
+    reason: "No strong bot evidence"
   }
 ];
 
-var SIGNAL_ORDER = [
-  ["text", "text_bot_prob"],
-  ["account", "account_risk_score"],
-  ["spam", "spam_pattern_score"],
-  ["coord", "coordination_score"]
-];
+var VIEW_LABELS = { globe: "Globe perspective", stacked: "Stacked perspective", traditional: "Traditional perspective" };
 
-var VIEW_LABELS = { stack: "Stacked perspective", ladder: "Ladder perspective", grid: "Contact sheet" };
-
-/* ---- helpers ----------------------------------------------------------- */
 function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-function pad2(n) { return String(n).padStart(2, "0"); }
-function fixed2(n) { return n.toFixed(2); }
 
 var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+var finePointer = window.matchMedia("(pointer: fine)");
 
-/* ---- build the deck ---------------------------------------------------- */
-var deck = document.querySelector("#deck");
-var expanded = document.querySelector("#expanded");
+var stack = document.querySelector("#coverStack");
+var expandedCard = document.querySelector("#expandedCard");
 var closeExpanded = document.querySelector("#closeExpanded");
-var stageFrame = document.querySelector("#stageFrame");
-var stageArt = document.querySelector("#stageArt");
+var archiveFrame = document.querySelector("#archiveFrame");
+var archiveArt = document.querySelector("#archiveArt");
 var selectionLabel = document.querySelector("#selectionLabel");
+var currentView = "stacked";
 var lastOpener = null;
 
-if (deck) {
-  SPECIMENS.forEach(function (spec, i) {
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "spec-card pal-" + spec.pal;
-    btn.dataset.index = String(i);
-    btn.style.setProperty("--i", String(i));
-    btn.style.setProperty("--col", String(i % 5));
-    btn.style.setProperty("--row", String(Math.floor(i / 5)));
-    btn.setAttribute("aria-label",
-      "Specimen " + pad2(i + 1) + ", verdict " + spec.verdict + ", score " + fixed2(spec.score) + ". Open details.");
-    btn.innerHTML =
-      '<span class="spec-head"><span class="spec-no">Spec ' + pad2(i + 1) + '</span>' +
-      '<span class="spec-verdict">' + spec.verdict + '</span></span>' +
-      '<span class="spec-text"><q>' + esc(spec.text) + '</q></span>' +
-      '<span class="spec-foot"><span class="spec-score">' + fixed2(spec.score) + '</span>' +
-      '<span class="spec-rule">Rule ' + spec.rule + '<br>' + esc(spec.ruleLabel) + '</span></span>';
-    btn.addEventListener("click", function () { openSpecimen(i, btn); });
-    deck.append(btn);
-  });
+/* ---- build the cover stack ----------------------------------------------
+   --i drives the stacked/globe transforms (unchanged formulas from the
+   reference); --center generalizes the globe arc to any book count instead
+   of a hardcoded "4" (only correct for exactly 10 covers). --col/--row drive
+   the traditional cascade, same as reference. */
+stack.style.setProperty("--center", String((BOOKS.length - 1) / 2));
+
+BOOKS.forEach(function (book, index) {
+  var button = document.createElement("button");
+  button.className = "magazine-cover palette-" + book.palette;
+  button.dataset.index = String(index);
+  button.setAttribute("aria-label", "Open " + book.title + " cover");
+  button.style.setProperty("--i", String(index));
+  button.style.setProperty("--col", String(index % 5));
+  button.style.setProperty("--row", String(Math.floor(index / 5)));
+  button.innerHTML =
+    '<span class="cover-top">' + esc(book.top) + '</span>' +
+    '<strong>' + esc(book.title) + '</strong>' +
+    '<span class="cover-art"><i>' + book.figure + '</i><i>' + book.figure + '</i><i>' + book.figure + '</i></span>' +
+    '<span class="cover-mark">' + esc(book.mark) + '</span>';
+  button.addEventListener("click", function () { openCover(index, button); });
+  stack.append(button);
+});
+
+/* ---- traditional view: size the cascade so every row stays inside the
+   panel, however many books there are and however small the viewport is.
+   Same transform formula as the reference (mod 5 columns × 23%, floor/5
+   rows × 115%, translate3d) — only the container's own width is solved for,
+   which in turn sets card height via the fixed .69 aspect ratio.
+
+   The container is vertically/horizontally centered on its OWN single-card
+   box (top:50%/left:53%), but the cascade only grows down-and-right from
+   that box by (rows-1)*115% / (cols-1)*23% of a card's own size — so the
+   true rendered bounds are asymmetric around the anchor, not the box. Solve
+   for the largest card size whose worst-case bound still lands inside the
+   panel. (At the reference's own hardcoded min(66%,450px), even its
+   original 10-cover/2-row case overflows most panel heights — this
+   generalizes correctly instead of copying that fragile constant.) */
+function sizeTraditionalView() {
+  if (currentView !== "traditional") return;
+  var n = BOOKS.length;
+  var rows = Math.ceil(n / 5);
+  var cols = Math.min(5, n);
+  var artRect = archiveArt.getBoundingClientRect();
+  if (!artRect.width || !artRect.height) return;
+  var aspect = 0.69;
+  var vDenom = 0.5 + (rows - 1) * 1.15;
+  var wByHeight = (artRect.height * 0.44 / vDenom) * aspect;
+  var hDenom = 0.5 + Math.max(0, cols - 1) * 0.23;
+  var wByWidth = artRect.width * 0.43 / hDenom;
+  var w = Math.max(70, Math.min(wByHeight, wByWidth, 620));
+  stack.style.setProperty("--trad-w", w + "px");
 }
 
-/* ---- open / close ------------------------------------------------------ */
-function openSpecimen(i, opener) {
-  var spec = SPECIMENS[i];
+/* ---- globe view: scale the arc's spread to the panel, not a fixed viewport.
+   The reference hardcodes 33px/45px/3px/7deg tuned for one specific desktop
+   width and exactly 10 covers; at any other panel size or book count the
+   outer covers drift past the panel edge. Same sin()-arc shape, same linear
+   per-index spread — only the step/amplitude/depth/rotation magnitudes are
+   solved from the actual panel width and book count so the arc always fits. */
+function sizeGlobeView() {
+  if (currentView !== "globe") return;
+  var n = BOOKS.length;
+  var center = (n - 1) / 2;
+  var artRect = archiveArt.getBoundingClientRect();
+  var cardRect = stack.getBoundingClientRect();
+  if (!artRect.width || !cardRect.width) return;
+  var budget = artRect.width * 0.36 - cardRect.width * 0.75;
+  var step = Math.max(4, Math.min(33, budget / Math.max(center, 1)));
+  var ratio = step / 33;
+  stack.style.setProperty("--globe-step", step + "px");
+  stack.style.setProperty("--globe-amp", (45 * ratio) + "px");
+  stack.style.setProperty("--globe-z", (3 * ratio) + "px");
+  stack.style.setProperty("--globe-rot", (7 * ratio) + "deg");
+}
+
+/* ---- open / close --------------------------------------------------------- */
+function openCover(index, opener) {
+  var book = BOOKS[index];
   lastOpener = opener || null;
 
-  var rows = SIGNAL_ORDER.map(function (pair) {
-    var key = pair[0], name = pair[1], v = spec.signals[key];
-    return '<div class="signal-row">' +
-      '<span class="sig-name">' + name + '</span>' +
-      '<span class="sig-bar"><span class="sig-fill" style="width:' + Math.round(v * 100) + '%"></span></span>' +
-      '<span class="sig-val">' + fixed2(v) + '</span>' +
-      '</div>';
-  }).join("");
-
-  expanded.innerHTML =
-    '<div class="expanded-face pal-' + spec.pal + '">' +
-      '<span class="spec-head"><span class="spec-no">Spec ' + pad2(i + 1) + '</span>' +
-      '<span class="spec-verdict">' + spec.verdict + '</span></span>' +
-      '<span class="spec-text"><q>' + esc(spec.text) + '</q></span>' +
-      '<span class="spec-foot"><span class="spec-score">' + fixed2(spec.score) + '</span>' +
-      '<span class="spec-rule">Rule ' + spec.rule + '<br>' + esc(spec.ruleLabel) + '</span></span>' +
+  var html =
+    '<div class="expanded-cover palette-' + book.palette + '">' +
+      '<span class="cover-top">' + esc(book.top) + '</span>' +
+      '<strong>' + esc(book.title) + '</strong>' +
+      '<span class="cover-art"><i>' + book.figure + '</i><i>' + book.figure + '</i><i>' + book.figure + '</i></span>' +
+      '<span class="cover-mark">' + esc(book.mark) + '</span>' +
     '</div>' +
     '<div class="expanded-copy">' +
-      '<span class="spec-kicker">Specimen ' + pad2(i + 1) + ' · decide() rule ' + spec.rule + ' of 7</span>' +
-      '<h2>' + fixed2(spec.score) + '</h2>' +
-      '<div class="expanded-level"><span class="tag ' + spec.pal + '">' + spec.verdict + '</span>' +
-        '<span class="spec-kicker">final_risk_level</span></div>' +
-      '<blockquote class="expanded-quote">' + esc(spec.text) + '</blockquote>' +
-      '<div class="expanded-meta">' + esc(spec.author) + ' · ' + esc(spec.meta) + '</div>' +
-      '<div class="signal-readout">' + rows + '</div>' +
-      '<p class="expanded-reason"><b>final_reasons</b>' + esc(spec.reason) + '</p>' +
-      '<button class="text-button" type="button" id="returnToDeck">Return to collection <span>↗</span></button>' +
-    '</div>';
+      '<span class="expanded-kicker">' + esc(book.kicker) + '</span>' +
+      '<h2>' + esc(book.headline) + '</h2>' +
+      '<div class="expanded-level"><span class="tag ' + book.tag + '">' + esc(book.tag === "component" ? "COMPONENT" : book.tag.toUpperCase()) + '</span>' +
+        '<span class="spec-kicker">' + esc(book.tagLabel) + '</span></div>';
 
-  stageFrame.classList.add("is-expanded");
-  expanded.classList.add("is-visible");
+  if (book.quote) {
+    html += '<blockquote class="expanded-quote">' + esc(book.quote) + '</blockquote>';
+    html += '<div class="expanded-meta">' + esc(book.meta) + '</div>';
+  }
+  if (book.signals) {
+    html += '<div class="signal-readout">' + Object.keys(book.signals).map(function (key) {
+      var v = book.signals[key];
+      return '<div class="signal-row"><span class="sig-name">' + key + '</span>' +
+        '<span class="sig-bar"><span class="sig-fill" style="width:' + Math.round(v * 100) + '%"></span></span>' +
+        '<span class="sig-val">' + v.toFixed(2) + '</span></div>';
+    }).join("") + '</div>';
+  }
+  html += '<p class="expanded-desc">' + esc(book.description) + '</p>';
+  if (book.facts) {
+    html += '<ul class="expanded-facts">' + book.facts.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join("") + '</ul>';
+  }
+  if (book.code) {
+    html += '<div class="expanded-code">' + book.code.map(function (c) { return '<code>' + esc(c) + '</code>'; }).join("") + '</div>';
+  }
+  if (book.reason) {
+    html += '<p class="expanded-reason"><b>final_reasons</b>' + esc(book.reason) + '</p>';
+  }
+  html += '<button class="text-button" id="returnToStack">Return to collection <span>↗</span></button>';
+
+  expandedCard.innerHTML = html;
+  archiveFrame.classList.add("is-expanded");
+  expandedCard.classList.add("is-visible");
   closeExpanded.classList.add("is-visible");
-  selectionLabel.textContent = "Specimen " + pad2(i + 1) + " · " + spec.verdict;
+  selectionLabel.textContent = book.title;
 
-  var back = document.querySelector("#returnToDeck");
-  back.addEventListener("click", closeSpecimen);
+  var back = document.querySelector("#returnToStack");
+  back.addEventListener("click", closeCover);
   back.focus();
 }
 
-function closeSpecimen() {
-  if (!stageFrame.classList.contains("is-expanded")) return;
-  stageFrame.classList.remove("is-expanded");
-  expanded.classList.remove("is-visible");
+function closeCover() {
+  if (!archiveFrame.classList.contains("is-expanded")) return;
+  archiveFrame.classList.remove("is-expanded");
+  expandedCard.classList.remove("is-visible");
   closeExpanded.classList.remove("is-visible");
-  selectionLabel.textContent = VIEW_LABELS[stageArt.dataset.view] || VIEW_LABELS.stack;
+  selectionLabel.textContent = VIEW_LABELS[currentView];
   if (lastOpener) { lastOpener.focus(); lastOpener = null; }
 }
 
-if (closeExpanded) closeExpanded.addEventListener("click", closeSpecimen);
-document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeSpecimen(); });
+closeExpanded.addEventListener("click", closeCover);
+document.addEventListener("keydown", function (event) { if (event.key === "Escape") closeCover(); });
 
-/* ---- perspective switcher ---------------------------------------------- */
-document.querySelectorAll(".view-button").forEach(function (btn) {
-  btn.addEventListener("click", function () {
-    var view = btn.dataset.view;
-    document.querySelectorAll(".view-button").forEach(function (b) {
-      b.classList.remove("is-active");
-      b.setAttribute("aria-pressed", "false");
+/* ---- perspective switcher: Globe / Stacked / Traditional, unchanged ------ */
+document.querySelectorAll(".view-button").forEach(function (button) {
+  button.addEventListener("click", function () {
+    var view = button.dataset.view;
+    document.querySelectorAll(".view-button").forEach(function (item) {
+      item.classList.remove("is-active");
+      item.setAttribute("aria-pressed", "false");
     });
-    btn.classList.add("is-active");
-    btn.setAttribute("aria-pressed", "true");
-    stageArt.dataset.view = view;
-    if (!stageFrame.classList.contains("is-expanded")) {
-      selectionLabel.textContent = VIEW_LABELS[view] || view;
+    button.classList.add("is-active");
+    button.setAttribute("aria-pressed", "true");
+    currentView = view;
+    archiveArt.dataset.view = view;
+    if (!archiveFrame.classList.contains("is-expanded")) {
+      selectionLabel.textContent = VIEW_LABELS[view];
     }
+    if (view === "traditional") sizeTraditionalView();
+    if (view === "globe") sizeGlobeView();
   });
 });
 
-/* ---- pointer parallax --------------------------------------------------- */
-if (stageArt) {
-  stageArt.addEventListener("pointermove", function (e) {
-    if (stageFrame.classList.contains("is-expanded") || reduceMotion.matches) return;
-    var b = stageArt.getBoundingClientRect();
-    var x = (e.clientX - b.left) / b.width - 0.5;
-    var y = (e.clientY - b.top) / b.height - 0.5;
-    stageArt.style.setProperty("--pointer-x", (x * 5) + "deg");
-    stageArt.style.setProperty("--pointer-y", (y * -4) + "deg");
-  });
-  stageArt.addEventListener("pointerleave", function () {
-    stageArt.style.setProperty("--pointer-x", "0deg");
-    stageArt.style.setProperty("--pointer-y", "0deg");
-  });
-}
+window.addEventListener("resize", function () { sizeTraditionalView(); sizeGlobeView(); }, { passive: true });
 
-/* ---- copy buttons (unchanged behaviour) --------------------------------- */
+/* ---- pointer parallax — fine pointers only, never on touch/coarse ------ */
+archiveArt.addEventListener("pointermove", function (event) {
+  if (archiveFrame.classList.contains("is-expanded") || reduceMotion.matches || !finePointer.matches) return;
+  var bounds = archiveArt.getBoundingClientRect();
+  var x = (event.clientX - bounds.left) / bounds.width - 0.5;
+  var y = (event.clientY - bounds.top) / bounds.height - 0.5;
+  archiveArt.style.setProperty("--pointer-x", (x * 5) + "deg");
+  archiveArt.style.setProperty("--pointer-y", (y * -4) + "deg");
+});
+archiveArt.addEventListener("pointerleave", function () {
+  archiveArt.style.setProperty("--pointer-x", "0deg");
+  archiveArt.style.setProperty("--pointer-y", "0deg");
+});
+
+/* ---- copy buttons --------------------------------------------------------- */
 function flash(btn, label) {
   btn.textContent = label;
   btn.classList.add("done");
@@ -275,16 +390,16 @@ document.querySelectorAll(".copy-btn").forEach(function (btn) {
   });
 });
 
-/* ---- nav: reveal after the stage + scrollspy ---------------------------- */
+/* ---- nav: reveal after the stage + scrollspy ------------------------------ */
 var siteNav = document.querySelector("nav");
-var stage = document.querySelector(".stage");
+var stageEl = document.querySelector(".stage");
 var navLinks = document.querySelectorAll(".nav-links a");
 var sections = Array.prototype.map.call(navLinks, function (a) {
   return document.querySelector(a.getAttribute("href"));
 });
 
 function onScroll() {
-  var trigger = stage ? stage.offsetHeight * 0.65 : 400;
+  var trigger = stageEl ? stageEl.offsetHeight * 0.65 : 400;
   if (siteNav) siteNav.classList.toggle("is-stuck", window.scrollY > trigger);
 
   var pos = window.scrollY + 120;
@@ -299,7 +414,7 @@ function onScroll() {
 window.addEventListener("scroll", onScroll, { passive: true });
 onScroll();
 
-/* ---- reveal on scroll ---------------------------------------------------- */
+/* ---- reveal on scroll ------------------------------------------------------ */
 var observer = new IntersectionObserver(
   function (entries) {
     entries.forEach(function (entry) {

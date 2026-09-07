@@ -26,12 +26,12 @@
 <!-- ================= STAGE ================= -->
 <div class="stage">
   <div class="stage-topline">
-    <span>Integrity / 4 signals · 3 verdicts</span>
+    <span>Backend / 6 components · 7 decision rules</span>
     <span id="selectionLabel">Stacked perspective</span>
   </div>
 
-  <div class="stage-frame" id="stageFrame">
-    <div class="stage-rail">
+  <div class="archive-frame" id="archiveFrame">
+    <div class="archive-intro">
       <div class="wordmark">yt-authentic<span class="tick">_</span></div>
       <span class="rail-kicker">One URL in · integrity report out</span>
       <p>Paste any YouTube link and get a per-comment <i>Low / Medium / High</i> risk verdict plus a
@@ -44,21 +44,21 @@
 
       <div class="perspective-controls">
         <span class="control-label">Select perspective</span>
-        <div class="view-buttons" role="group" aria-label="Select deck perspective">
-          <button class="view-button is-active" type="button" data-view="stack" aria-pressed="true"><span class="view-icon">▱</span>Stack view</button>
-          <button class="view-button" type="button" data-view="ladder" aria-pressed="false"><span class="view-icon">≡</span>Ladder view</button>
-          <button class="view-button" type="button" data-view="grid" aria-pressed="false"><span class="view-icon">⊞</span>Contact sheet</button>
+        <div class="view-buttons" role="group" aria-label="Select archive perspective">
+          <button class="view-button" type="button" data-view="globe" aria-pressed="false"><span class="view-icon">⊕</span>Globe view</button>
+          <button class="view-button is-active" type="button" data-view="stacked" aria-pressed="true"><span class="view-icon">▱</span>Stacked view</button>
+          <button class="view-button" type="button" data-view="traditional" aria-pressed="false"><span class="view-icon">⊞</span>Traditional view</button>
         </div>
       </div>
     </div>
 
-    <div class="stage-art" id="stageArt" data-view="stack">
+    <div class="archive-art" id="archiveArt" data-view="stacked">
       <div class="orbit-line orbit-one"></div>
       <div class="orbit-line orbit-two"></div>
-      <div class="deck" id="deck" aria-label="Scored comment specimens"></div>
-      <div class="expanded" id="expanded" aria-live="polite"></div>
-      <button class="close-expanded" type="button" id="closeExpanded" aria-label="Close selected specimen">×</button>
-      <div class="drag-hint"><span class="hint-dot"></span><span>Click a specimen to inspect</span></div>
+      <div class="cover-stack" id="coverStack" aria-label="Backend components and decision rules"></div>
+      <div class="expanded-card" id="expandedCard" aria-live="polite"></div>
+      <button class="close-expanded" type="button" id="closeExpanded" aria-label="Close selected cover">×</button>
+      <div class="drag-hint"><span class="hint-dot"></span><span>Click a cover to inspect</span></div>
     </div>
   </div>
 
