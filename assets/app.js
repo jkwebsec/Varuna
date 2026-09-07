@@ -149,6 +149,15 @@ var BOOKS = [
 
 var VIEW_LABELS = { globe: "Globe perspective", stacked: "Stacked perspective", traditional: "Traditional perspective" };
 
+/* =========================================================================
+   DEMO REEL — the one line to change.
+   Swap DEMO_VIDEO_URL for any YouTube link (youtu.be / watch?v= / shorts /
+   live / embed, tracking params like ?si= are fine) and the screening
+   section rebuilds itself: poster, caption, and embed all follow.
+   ========================================================================= */
+var DEMO_VIDEO_URL = "https://youtu.be/3cqu_xnuPnw?si=eUsJQIpTZJwG_jdP";
+
+
 function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -456,3 +465,237 @@ var observer = new IntersectionObserver(
   { threshold: 0.08 }
 );
 document.querySelectorAll(".reveal").forEach(function (el) { observer.observe(el); });
+
+/* ---- demo reel: poster → click to play → embed ----------------------------- */
+function youTubeId(url) {
+  if (!url) return null;
+  var m = String(url).match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/))([A-Za-z0-9_-]{11})/
+  );
+  return m ? m[1] : null;
+}
+
+function loadCinema() {
+  var cinema = document.getElementById("cinema");
+  var stage = document.getElementById("cinemaStage");
+  var meta = document.getElementById("cinemaMeta");
+  var caption = document.getElementById("cinemaCaption");
+  var replayBtn = document.getElementById("cinemaReplay");
+  if (!cinema || !stage) return;
+
+  var id = youTubeId(DEMO_VIDEO_URL);
+
+  if (!id) {
+    cinema.classList.add("is-bad");
+    if (meta) meta.textContent = "no playable id";
+    if (caption) caption.textContent = "couldn’t read a YouTube id from the configured link";
+    var bad = document.createElement("div");
+    bad.className = "cinema-bad";
+    bad.innerHTML =
+      '<span>No reel to screen — the configured link has no YouTube id.</span>' +
+      '<span class="bd-code">' + esc(DEMO_VIDEO_URL || "(empty)") + "</span>";
+    var screenEl = document.getElementById("cinemaScreen");
+    (screenEl || stage.parentNode).appendChild(bad);
+    return;
+  }
+
+  if (meta) meta.textContent = id + " · 16:9 · youtube";
+  if (caption) caption.textContent = "still · click the reel to roll";
+
+  /* YouTube refuses to play inline when the page has no http referer (e.g. it
+     is opened straight from disk as file://). If that is how this page is being
+     viewed, surface the fix instead of letting the player silently degrade to
+     a "Watch on YouTube" screen. */
+  var openedFromDisk = window.location.protocol === "file:";
+  if (openedFromDisk) {
+    cinema.classList.add("is-bad");
+    if (meta) meta.textContent = "file:// — embeds blocked by YouTube";
+    if (caption) caption.textContent = "serve over http://localhost, then the reel plays here";
+    var diskHint = document.createElement("div");
+    diskHint.className = "cinema-bad";
+    diskHint.innerHTML =
+      "<span>YouTube won’t play inside a page opened from disk.</span>" +
+      '<span class="bd-code">cd ' + esc("yt-authentic") + " && python3 -m http.server 8000</span>" +
+      '<span class="bd-code">then open http://localhost:8000</span>';
+    var screenEl0 = document.getElementById("cinemaScreen");
+    (screenEl0 || stage.parentNode).appendChild(diskHint);
+    return;
+  }
+
+  /* poster stage */
+  var poster = document.createElement("img");
+  poster.className = "cinema-poster";
+  poster.alt = "Poster frame of the Varuna demonstration video";
+  poster.loading = "lazy";
+  poster.onerror = function () {
+    if (poster.src.indexOf("hqdefault") === -1) {
+      poster.src = "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
+    } else {
+      poster.style.display = "none";
+      stage.classList.add("has-poster-fallback");
+    }
+  };
+  poster.src = "https://i.ytimg.com/vi/" + id + "/maxresdefault.jpg";
+
+  var veil = document.createElement("div");
+  veil.className = "cinema-veil";
+
+  var play = document.createElement("button");
+  play.className = "cinema-play";
+  play.type = "button";
+  play.setAttribute("aria-label", "Play the demonstration video");
+  play.innerHTML = '<span class="play-glyph" aria-hidden="true"></span>';
+
+  var note = document.createElement("div");
+  note.className = "cinema-note";
+  note.innerHTML =
+    '<span class="shot">shot 01 · live run</span>' +
+    '<span class="id">' + esc(id) + "</span>";
+
+  stage.appendChild(poster);
+  stage.appendChild(veil);
+  stage.appendChild(play);
+  stage.appendChild(note);
+
+  var hostEl = null;
+  var player = null;
+  var failed = false;
+
+  /* YT.Player replaces the host element with an <iframe>; after destroy() the
+     host is gone, so re-create it whenever playback is (re)started. */
+  function ensureHost() {
+    if (hostEl && hostEl.isConnected) return hostEl;
+    var fresh = document.createElement("div");
+    fresh.className = "cinema-embed-host";
+    fresh.id = "cinemaHost";
+    stage.appendChild(fresh);
+    hostEl = fresh;
+    return hostEl;
+  }
+
+  function destroyPlayer() {
+    if (player) {
+      try { player.destroy(); } catch (e) {}
+      player = null;
+    }
+    if (hostEl && hostEl.isConnected) {
+      try { hostEl.remove(); } catch (e2) {}
+    }
+    hostEl = null;
+  }
+
+  function showBlocked(code) {
+    if (failed) return;
+    failed = true;
+    destroyPlayer();
+    cinema.classList.add("is-owner-blocked");
+    if (caption) caption.textContent = "embedding blocked by the video owner";
+    var overlay = document.createElement("div");
+    overlay.className = "cinema-owner-blocked";
+    var msg =
+      code === 100 || code === 2
+        ? "This video can’t be played here."
+        : "This video’s owner has blocked embedding.";
+    overlay.innerHTML =
+      "<span>" + msg + "</span>" +
+      '<a class="owner-link" href="' + esc(DEMO_VIDEO_URL) + '" target="_blank" rel="noreferrer noopener">Watch on YouTube ↗</a>' +
+      '<span class="owner-hint">swap DEMO_VIDEO_URL in assets/app.js to feature another reel</span>';
+    stage.appendChild(overlay);
+    if (replayBtn) { replayBtn.hidden = true; replayBtn.disabled = true; }
+  }
+
+  function startPlayback() {
+    if (failed) return;
+    ensureHost();
+    var watchdog = setTimeout(function () {
+      if (!player && !failed) showBlocked(2);
+    }, 6000);
+    loadYouTubeAPI(function () {
+      if (failed) return;
+      try {
+        player = new YT.Player(hostEl, {
+          width: "100%",
+          height: "100%",
+          videoId: id,
+          playerVars: { autoplay: 1, playsinline: 1, rel: 0, color: "white" },
+          events: {
+            onReady: function (event) {
+              clearTimeout(watchdog);
+              if (!failed) {
+                var why = 0;
+                try {
+                  var vd = event.target.getVideoData && event.target.getVideoData();
+                  why = vd && vd.video_id ? 0 : 2;
+                } catch (e2) {}
+                if (why === 0) {
+                  try { event.target.playVideo(); } catch (e3) {}
+                  cinema.classList.add("is-playing");
+                  play.style.display = "none";
+                  note.style.display = "none";
+                  if (caption) caption.textContent = "rolling · the full run, start to finish";
+                  if (replayBtn) { replayBtn.hidden = false; replayBtn.disabled = false; }
+                } else {
+                  showBlocked(2);
+                }
+              }
+            },
+            onStateChange: function (event) {
+              if (event.data === YT.PlayerState.PLAYING && cinema && !cinema.classList.contains("is-playing")) {
+                cinema.classList.add("is-playing");
+                play.style.display = "none";
+                note.style.display = "none";
+                if (caption) caption.textContent = "rolling · the full run, start to finish";
+                if (replayBtn) { replayBtn.hidden = false; replayBtn.disabled = false; }
+              }
+            },
+            onError: function (event) {
+              clearTimeout(watchdog);
+              showBlocked(event.data);
+            }
+          }
+        });
+      } catch (err) {
+        clearTimeout(watchdog);
+        showBlocked(2);
+      }
+    });
+  }
+
+  play.addEventListener("click", startPlayback);
+
+  if (replayBtn) {
+    replayBtn.addEventListener("click", function () {
+      destroyPlayer();
+      failed = false;
+      cinema.classList.remove("is-playing");
+      cinema.classList.remove("is-owner-blocked");
+      var wreck2 = stage.querySelector(".cinema-owner-blocked");
+      if (wreck2) wreck2.remove();
+      play.style.display = "";
+      note.style.display = "";
+      if (caption) caption.textContent = "still · click the reel to roll";
+      replayBtn.disabled = true;
+      replayBtn.hidden = true;
+    });
+  }
+}
+
+/* ---- YouTube IFrame API loader (official, gives us real onError codes) ----- */
+function loadYouTubeAPI(cb) {
+  if (window.YT && window.YT.Player) { cb(); return; }
+  if (window.__ytApiCallbacks) { window.__ytApiCallbacks.push(cb); return; }
+  window.__ytApiCallbacks = [cb];
+  var prev = window.onYouTubeIframeAPIReady;
+  window.onYouTubeIframeAPIReady = function () {
+    if (prev) prev();
+    (window.__ytApiCallbacks || []).forEach(function (fn) { fn(); });
+    window.__ytApiCallbacks = [];
+  };
+  var script = document.createElement("script");
+  script.src = "https://www.youtube.com/iframe_api";
+  script.async = true;
+  document.head.appendChild(script);
+}
+
+loadCinema();
+

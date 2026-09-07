@@ -18,7 +18,9 @@
       <a href="#architecture">architecture</a>
       <a href="#scoring">scoring</a>
       <a href="#demo">demo</a>
+      <a href="#watch">watch</a>
       <a href="#replicate">replicate</a>
+      <a href="#credits">credits</a>
     </div>
   </div>
 </nav>
@@ -338,6 +340,37 @@ decide(): hard_scam → High 0.90
   </div>
 </section>
 
+<!-- ================= WATCH ================= -->
+<section id="watch">
+  <div class="section-head reveal">
+    <span class="eyebrow">Watch</span>
+    <div>
+      <h2>The run, screening</h2>
+      <p>A real session of Varuna, start to finish — URL in, integrity report out. The frame below is a live
+      YouTube embed, not a mock-up: press play and the whole pipeline runs in front of you.</p>
+    </div>
+  </div>
+
+  <div class="cinema reveal" id="cinema">
+    <div class="cinema-bar">
+      <span class="cinema-brand">Varuna<span class="tick">_</span> · demo reel</span>
+      <span class="cinema-meta" id="cinemaMeta">resolving reel…</span>
+    </div>
+
+    <div class="cinema-screen" id="cinemaScreen" aria-label="Demonstration video player">
+      <div class="cinema-stage" id="cinemaStage"></div>
+    </div>
+
+    <div class="cinema-strip">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="cinema-caption" id="cinemaCaption">still · click the reel to roll</span>
+      <span class="cinema-controls">
+        <button class="cinema-replay" type="button" id="cinemaReplay" hidden>replay</button>
+      </span>
+    </div>
+  </div>
+</section>
+
 <!-- ================= REPLICATE ================= -->
 <section id="replicate">
   <div class="section-head reveal">
@@ -472,6 +505,28 @@ git push -u origin main</code></pre>
     <tr><td>everything is "Low", no model output</td><td><code>HAS_MODEL=False</code></td><td>do step 5, or accept heuristic-only mode</td></tr>
     <tr><td>403 on the API key</td><td>API key restrictions misconfigured</td><td>key → Edit → API restrictions → allow <b>YouTube Data API v3</b></td></tr>
   </table>
+  </div>
+</section>
+
+<section id="credits">
+  <div class="section-head reveal">
+    <span class="eyebrow">Credits</span>
+    <div>
+      <h2>Guidance</h2>
+      <p>Varuna was built under academic supervision — the people behind the project's direction and review.</p>
+    </div>
+  </div>
+  <div class="grid grid-3">
+    <div class="card reveal">
+      <span class="icon">advisor</span>
+      <h3>Faculty Advisor</h3>
+      <p>Prof. Prithwijit Guha</p>
+    </div>
+    <div class="card reveal">
+      <span class="icon">mentor</span>
+      <h3>Mentor</h3>
+      <p>Mohd. Amaan</p>
+    </div>
   </div>
 </section>
 
