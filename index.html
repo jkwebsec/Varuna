@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f3f3f1">
 <title>yt-authentic — YouTube Comment Integrity Analyzer</title>
 <meta name="description" content="Paste a YouTube URL. Get an integrity report: bot probability, scam patterns, account-farm risk, coordination detection. LightGBM + regex + YouTube Data API v3.">
 <link rel="stylesheet" href="assets/style.css">
@@ -22,60 +23,73 @@
   </div>
 </nav>
 
-<main>
-
-<!-- ================= HERO ================= -->
-<div class="hero">
-  <div class="hero-glow"></div>
-  <h1>One URL in.<br><span class="grad">Integrity report out.</span></h1>
-  <p class="tagline">
-    Paste any YouTube link and get a per-comment <code>Low / Medium / High</code> risk verdict plus a
-    per-video <b>Authenticity Score</b> — bot-text classifier, account-farm heuristics, scam regexes
-    and coordination detection, fused into one decision ladder.
-  </p>
-  <div class="hero-cta">
-    <a class="btn primary" href="#replicate">replicate in ~5 min</a>
-    <a class="btn" href="https://github.com/jkwebsec/Varuna" rel="noreferrer" target="_blank">view on github ↗</a>
+<!-- ================= STAGE ================= -->
+<div class="stage">
+  <div class="stage-topline">
+    <span>Integrity / 4 signals · 3 verdicts</span>
+    <span id="selectionLabel">Stacked perspective</span>
   </div>
 
-  <div class="stats">
-    <div class="stat"><div class="num g">4</div><div class="lbl">independent risk signals</div></div>
-    <div class="stat"><div class="num b">3</div><div class="lbl">risk levels per comment</div></div>
-    <div class="stat"><div class="num y">1000</div><div class="lbl">max comments / run</div></div>
-    <div class="stat"><div class="num r">/100</div><div class="lbl">authenticity score</div></div>
-    <div class="stat"><div class="num b">2</div><div class="lbl">modes: model + heuristic-only</div></div>
+  <div class="stage-frame" id="stageFrame">
+    <div class="stage-rail">
+      <div class="wordmark">yt-authentic<span class="tick">_</span></div>
+      <span class="rail-kicker">One URL in · integrity report out</span>
+      <p>Paste any YouTube link and get a per-comment <i>Low / Medium / High</i> risk verdict plus a
+      per-video Authenticity Score — bot-text classifier, account-farm heuristics, scam regexes and
+      coordination detection, fused into one decision ladder.</p>
+      <div class="rail-cta">
+        <a class="btn primary" href="#replicate">Replicate in ~5 min<span>↓</span></a>
+        <a class="btn" href="https://github.com/jkwebsec/Varuna" rel="noreferrer" target="_blank">View on GitHub<span>↗</span></a>
+      </div>
+
+      <div class="perspective-controls">
+        <span class="control-label">Select perspective</span>
+        <div class="view-buttons" role="group" aria-label="Select deck perspective">
+          <button class="view-button is-active" type="button" data-view="stack" aria-pressed="true"><span class="view-icon">▱</span>Stack view</button>
+          <button class="view-button" type="button" data-view="ladder" aria-pressed="false"><span class="view-icon">≡</span>Ladder view</button>
+          <button class="view-button" type="button" data-view="grid" aria-pressed="false"><span class="view-icon">⊞</span>Contact sheet</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage-art" id="stageArt" data-view="stack">
+      <div class="orbit-line orbit-one"></div>
+      <div class="orbit-line orbit-two"></div>
+      <div class="deck" id="deck" aria-label="Scored comment specimens"></div>
+      <div class="expanded" id="expanded" aria-live="polite"></div>
+      <button class="close-expanded" type="button" id="closeExpanded" aria-label="Close selected specimen">×</button>
+      <div class="drag-hint"><span class="hint-dot"></span><span>Click a specimen to inspect</span></div>
+    </div>
   </div>
 
-  <div class="terminal">
-    <div class="terminal-bar">
-      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-      <span class="terminal-title">zsh — yt-authentic</span>
-    </div>
-    <div class="terminal-body">
-<span class="prompt">$</span> <span class="cmd">export YOUTUBE_API_KEY="AIza..."</span><br>
-<span class="prompt">$</span> <span class="cmd">python app.py</span><br>
-<span class="out">Running on local URL: http://127.0.0.1:7860</span><br>
-<br>
-<span class="prompt">$</span> <span class="cmd">analyze("https://youtu.be/dQw4w9WgXcQ", max_comments=1000)</span><br>
-<span class="out">comments fetched ......................... 1000</span><br>
-<span class="out">scored (text + account + spam + coord) ... 1000</span><br>
-<span class="out">─────────────────────────────────────────────────</span><br>
-<span class="out">Genuine (Low):       </span><span class="ok">821</span> <span class="out">(82.10%)</span><br>
-<span class="out">Suspicious (Medium): </span><span class="warn">132</span> <span class="out">(13.20%)</span><br>
-<span class="out">Bot/Spam (High):     </span><span class="bad">47</span> <span class="out">( 4.70%)</span><br>
-<span class="out">─────────────────────────────────────────────────</span><br>
-<span class="out">Authenticity Score:  </span><span class="ok">88.70 / 100</span> <span class="out">→ video risk:</span> <span class="ok">Low</span>
-    </div>
+  <div class="stage-bottomline">
+    <span>© 2026 · yt-authentic</span>
+    <span>Scroll for the method</span>
   </div>
 </div>
+
+<!-- ================= MASTHEAD STATS ================= -->
+<div class="masthead">
+  <div class="masthead-stats">
+    <div class="mstat"><div class="num">4</div><div class="lbl">independent risk signals</div></div>
+    <div class="mstat"><div class="num">3</div><div class="lbl">risk levels per comment</div></div>
+    <div class="mstat"><div class="num">1000</div><div class="lbl">max comments / run</div></div>
+    <div class="mstat"><div class="num">/100</div><div class="lbl">authenticity score</div></div>
+    <div class="mstat"><div class="num">2</div><div class="lbl">modes: model + heuristic-only</div></div>
+  </div>
+</div>
+
+<main>
 
 <!-- ================= OVERVIEW ================= -->
 <section id="overview">
   <div class="section-head reveal">
-    <span class="eyebrow">overview</span>
-    <h2>What it detects</h2>
-    <p>Six components, one pipeline. Everything below runs on a single video URL with zero training at
-    inference time — the trained artifacts are optional (heuristic-only mode works out of the box).</p>
+    <span class="eyebrow">Overview</span>
+    <div>
+      <h2>What it detects</h2>
+      <p>Six components, one pipeline. Everything below runs on a single video URL with zero training at
+      inference time — the trained artifacts are optional (heuristic-only mode works out of the box).</p>
+    </div>
   </div>
   <div class="grid grid-3">
     <div class="card reveal">
@@ -146,36 +160,38 @@
 <!-- ================= ARCHITECTURE ================= -->
 <section id="architecture">
   <div class="section-head reveal">
-    <span class="eyebrow">architecture</span>
-    <h2>Pipeline, left to right</h2>
-    <p>One entry, one exit. Nothing between them is stateful — every comment passes through all four
-    signals before <code>decide()</code> applies the ordered rule ladder.</p>
+    <span class="eyebrow">Architecture</span>
+    <div>
+      <h2>Pipeline, left to right</h2>
+      <p>One entry, one exit. Nothing between them is stateful — every comment passes through all four
+      signals before <code>decide()</code> applies the ordered rule ladder.</p>
+    </div>
   </div>
 
   <div class="flow reveal">
     <div class="flow-row">
       <div class="flow-box"><div class="fn">YouTube URL</div><div class="sub">watch / youtu.be / shorts / live</div></div>
     </div>
-    <div class="arrow"></div>
+    <div class="flow-rule"></div>
     <div class="flow-row">
       <div class="flow-box"><div class="fn">extract_video_id()</div><div class="sub">urlparse + parse_qs, all formats</div></div>
     </div>
-    <div class="arrow"></div>
+    <div class="flow-rule"></div>
     <div class="flow-row">
       <div class="flow-box"><div class="fn">fetch_comments()</div><div class="sub">YouTube Data API v3 · pagination · replies</div></div>
     </div>
-    <div class="arrow"></div>
+    <div class="flow-rule"></div>
     <div class="flow-row">
       <div class="flow-box signal g"><div class="fn">text_bot_prob</div><div class="sub">LightGBM + TF-IDF</div></div>
       <div class="flow-box signal y"><div class="fn">account_risk_score</div><div class="sub">per-channel stats</div></div>
       <div class="flow-box signal r"><div class="fn">spam_pattern_score</div><div class="sub">scam regexes</div></div>
       <div class="flow-box signal b"><div class="fn">coordination_score</div><div class="sub">dup text ≥2 accts</div></div>
     </div>
-    <div class="arrow"></div>
+    <div class="flow-rule"></div>
     <div class="flow-row">
       <div class="flow-box decide"><div class="fn">decide()</div><div class="sub">ordered rule ladder → level + score + reason</div></div>
     </div>
-    <div class="arrow"></div>
+    <div class="flow-rule"></div>
     <div class="flow-row">
       <div class="flow-box"><div class="fn">Integrity Report</div><div class="sub">markdown + chart + top-15 + full df</div></div>
       <div class="flow-box"><div class="fn">Gradio UI</div><div class="sub">share=True or localhost:7860</div></div>
@@ -183,7 +199,7 @@
   </div>
 
   <div class="codeblock reveal">
-    <div class="cb-head"><span>terminal view — same pipeline</span></div>
+    <div class="cb-head"><span>Signal fusion — the same pipeline, condensed</span></div>
     <pre><code><span class="c"># signal fusion, condensed</span>
 text_bot_prob      → suspicion: strong ≥0.85 · moderate ≥0.60 · weak ≥0.40
 account_risk_score → farm risk:  ≥0.60 High · ≥0.45 Medium · ≥0.30 supports
@@ -203,14 +219,16 @@ decide(): hard_scam → High 0.90
 <!-- ================= SCORING ================= -->
 <section id="scoring">
   <div class="section-head reveal">
-    <span class="eyebrow">scoring engine</span>
-    <h2>Every threshold, exactly as implemented</h2>
-    <p>No black boxes. These tables are the code — copy the rules and you can rebuild the classifier's
-    decision logic by hand.</p>
+    <span class="eyebrow">Scoring engine</span>
+    <div>
+      <h2>Every threshold, exactly as implemented</h2>
+      <p>No black boxes. These tables are the code — copy the rules and you can rebuild the classifier's
+      decision logic by hand.</p>
+    </div>
   </div>
 
-  <h3 style="margin-top:34px">1 · Account-farm risk <code>account_risk_score</code> (cap 1.0)</h3>
-  <div class="reveal">
+  <h3 class="sub">1 · Account-farm risk <code>account_risk_score</code> (cap 1.0)</h3>
+  <div class="ledger reveal">
   <table>
     <tr><th>condition</th><th>points</th><th>rationale</th></tr>
     <tr><td><code>videos_commented ≥ 3</code></td><td>+0.40</td><td>spams across many videos — classic farm behavior</td></tr>
@@ -223,8 +241,8 @@ decide(): hard_scam → High 0.90
   </table>
   </div>
 
-  <h3 style="margin-top:34px">2 · Scam patterns <code>spam_pattern_score</code> (cap 0.50)</h3>
-  <div class="reveal">
+  <h3 class="sub">2 · Scam patterns <code>spam_pattern_score</code> (cap 0.50)</h3>
+  <div class="ledger reveal">
   <table>
     <tr><th>regex class</th><th>points</th><th>matches</th></tr>
     <tr><td>link</td><td>+0.20</td><td><code>http</code>, <code>www.</code>, <code>t.me</code>, <code>wa.me</code>, <code>bit.ly</code>, <code>tinyurl</code></td></tr>
@@ -233,16 +251,16 @@ decide(): hard_scam → High 0.90
   </table>
   </div>
 
-  <h3 style="margin-top:34px">3 · Coordination <code>coordination_score</code></h3>
-  <div class="reveal">
+  <h3 class="sub">3 · Coordination <code>coordination_score</code></h3>
+  <div class="ledger reveal">
   <table>
     <tr><th>condition</th><th>points</th><th>rationale</th></tr>
     <tr><td>same normalized text, <code>≥2 unique accounts</code>, <code>≥2 posts</code></td><td>+0.20</td><td>identical wording from different accounts = brigade</td></tr>
   </table>
   </div>
 
-  <h3 style="margin-top:34px">4 · Text suspicion tiers (from model probability)</h3>
-  <div class="reveal">
+  <h3 class="sub">4 · Text suspicion tiers (from model probability)</h3>
+  <div class="ledger reveal">
   <table>
     <tr><th>probability</th><th>tier</th><th>effect</th></tr>
     <tr><td><code>p ≥ 0.85</code></td><td><span class="tag high">strong</span></td><td>can trigger High with any support signal</td></tr>
@@ -252,8 +270,8 @@ decide(): hard_scam → High 0.90
   </table>
   </div>
 
-  <h3 style="margin-top:34px">5 · Decision ladder <code>decide()</code> — first match wins</h3>
-  <div class="reveal">
+  <h3 class="sub">5 · Decision ladder <code>decide()</code> — first match wins</h3>
+  <div class="ledger reveal">
   <table>
     <tr><th>#</th><th>rule</th><th>level</th><th>score</th><th>reason string</th></tr>
     <tr><td>1</td><td><code>hard_scam == 1</code></td><td><span class="tag high">High</span></td><td>0.90</td><td>Hard scam/contact pattern</td></tr>
@@ -266,9 +284,9 @@ decide(): hard_scam → High 0.90
   </table>
   </div>
 
-  <div class="formula reveal">
-    <span class="fn">authenticity</span> <span class="op">=</span> <span class="val">(low·1 + medium·0.5 + high·0) ÷ total × 100</span><br>
-    <span class="fn">video_risk</span> <span class="op">=</span> <span class="val">Low</span> <span class="op">if ≥85</span> · <span class="val">Medium</span> <span class="op">if ≥60</span> · <span class="val">High</span> <span class="op">otherwise</span><br>
+  <div class="colophon reveal">
+    <div class="line"><span class="fn">authenticity</span> <span class="op">=</span> <span class="val">(low·1 + medium·0.5 + high·0) ÷ total × 100</span></div>
+    <div class="line"><span class="fn">video_risk</span> <span class="op">=</span> <span class="val">Low</span> <span class="op">if ≥85</span> · <span class="val">Medium</span> <span class="op">if ≥60</span> · <span class="val">High</span> <span class="op">otherwise</span></div>
     <span class="note"># hard_scam regexes: free recovery · lost crypto · signal group · guaranteed profit · whatsapp · telegram · t.me · wa.me · bit.ly · tinyurl · "dm me" · "inbox me" · "contact me"+context · unicode-bold digits+contact word</span>
   </div>
 </section>
@@ -276,29 +294,59 @@ decide(): hard_scam → High 0.90
 <!-- ================= DEMO ================= -->
 <section id="demo">
   <div class="section-head reveal">
-    <span class="eyebrow">demo</span>
-    <h2>The UI</h2>
-    <p>Gradio, zero frontend code. URL in → markdown report + distribution chart + top-15 suspicious
-    table out. Screenshot from a live run.</p>
+    <span class="eyebrow">Demo</span>
+    <div>
+      <h2>The UI</h2>
+      <p>Gradio, zero frontend code. URL in → markdown report + distribution chart + top-15 suspicious
+      table out. Screenshot from a live run.</p>
+    </div>
   </div>
-  <div class="browser reveal">
-    <div class="browser-bar">
-      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-      <span class="browser-url">https://localhost:7860/ — YouTube Comment Integrity Analyzer</span>
+
+  <div class="transcript reveal">
+    <div class="transcript-head">
+      <span class="mark f"></span><span class="mark"></span><span class="mark"></span>
+      <span class="transcript-title">zsh — yt-authentic</span>
     </div>
-    <div class="browser-body">
-      <img src="assets/app-screenshot.png" alt="yt-authentic Gradio UI — integrity report output" loading="lazy">
+    <div class="transcript-body">
+<span class="prompt">$</span> <span class="cmd">export YOUTUBE_API_KEY="AIza..."</span><br>
+<span class="prompt">$</span> <span class="cmd">python app.py</span><br>
+<span class="out">Running on local URL: http://127.0.0.1:7860</span><br>
+<br>
+<span class="prompt">$</span> <span class="cmd">analyze("https://youtu.be/dQw4w9WgXcQ", max_comments=1000)</span><br>
+<span class="out">comments fetched ......................... 1000</span><br>
+<span class="out">scored (text + account + spam + coord) ... 1000</span><br>
+<span class="out">─────────────────────────────────────────────────</span><br>
+<span class="out">Genuine (Low):       </span><span class="ok">821</span> <span class="out">(82.10%)</span><br>
+<span class="out">Suspicious (Medium): </span><span class="warn">132</span> <span class="out">(13.20%)</span><br>
+<span class="out">Bot/Spam (High):     </span><span class="bad">47</span> <span class="out">( 4.70%)</span><br>
+<span class="out">─────────────────────────────────────────────────</span><br>
+<span class="out">Authenticity Score:  </span><span class="ok">88.70 / 100</span> <span class="out">→ video risk:</span> <span class="ok">Low</span>
     </div>
+  </div>
+
+  <div class="plate reveal">
+    <div class="plate-bar">
+      <span class="mark"></span><span class="mark"></span><span class="mark"></span>
+      <span class="plate-url">https://localhost:7860/ — YouTube Comment Integrity Analyzer</span>
+    </div>
+    <img src="assets/app-screenshot.png" alt="yt-authentic Gradio UI — integrity report output" loading="lazy">
+  </div>
+  <div class="plate-caption reveal">
+    <p>A live run over 1,000 comments: 994 Low, 6 Medium, 0 High — Authenticity Score 99.7/100,
+    video risk Low. The plate above is the app itself, unedited.</p>
+    <span class="plate-caption-label">Plate 01 · app.py</span>
   </div>
 </section>
 
 <!-- ================= REPLICATE ================= -->
 <section id="replicate">
   <div class="section-head reveal">
-    <span class="eyebrow">replicate</span>
-    <h2>From zero to running — 5 minutes</h2>
-    <p>Copy → paste → run. Every command is exact. If a step fails, the troubleshooting table at the
-    bottom maps the error message to the fix.</p>
+    <span class="eyebrow">Replicate</span>
+    <div>
+      <h2>From zero to running — 5 minutes</h2>
+      <p>Copy → paste → run. Every command is exact. If a step fails, the troubleshooting table at the
+      bottom maps the error message to the fix.</p>
+    </div>
   </div>
 
   <div class="step reveal">
@@ -413,8 +461,8 @@ git push -u origin main</code></pre>
     </div>
   </div>
 
-  <h3 style="margin-top:44px">Troubleshooting — error → fix</h3>
-  <div class="reveal">
+  <h3 class="sub">Troubleshooting — error → fix</h3>
+  <div class="ledger reveal">
   <table>
     <tr><th>you see</th><th>cause</th><th>fix</th></tr>
     <tr><td><code>Set YOUTUBE_API_KEY environment variable first.</code></td><td>key not exported, or new terminal</td><td>re-run step 3, then restart <code>app.py</code></td></tr>
