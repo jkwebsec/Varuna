@@ -192,16 +192,28 @@ nav.is-stuck { transform: none; }
   padding: 11px 10px 12px; display: flex; flex-direction: column; justify-content: space-between;
   border: 1px solid var(--rule);
   box-shadow: -2px 2px 0 var(--rule), 7px 8px 13px rgba(0,0,0,.13);
-  transform: translate3d(calc(var(--i) * var(--stack-step-x, 14px)), calc(var(--i) * var(--stack-step-y, -7px)), calc(var(--i) * var(--stack-step-z, 10px))) rotate(calc(var(--i) * .6deg)) scale(calc(.88 + var(--depth, 0) * .12));
+  transform: translate3d(calc(var(--i) * var(--stack-step-x, 14px)), calc(var(--i) * var(--stack-step-y, -7px)), calc(var(--i) * var(--stack-step-z, 10px))) rotate(calc(var(--i) * .6deg));
   transform-origin: bottom left;
-  opacity: calc(.6 + var(--depth, 0) * .4);
   transition: transform .45s cubic-bezier(.2,.8,.2,1), filter .45s, opacity .45s;
   text-align: left;
 }
+/* depth scale is the stacked-view perspective cue only — traditional and
+   globe reuse the same --i cascade for layout, not depth, so their covers must
+   stay fully opaque or the fan's edges bleed/overlap into unreadable text.
+   Stacked covers also stay fully opaque: a depth-fade opacity here made
+   overlapping edges translucent, so the next card's icon showed through
+   as a "ghost" — scale alone gives the depth cue without any bleed. */
+#archiveArt[data-view='stacked'] .magazine-cover {
+  transform: translate3d(calc(var(--i) * var(--stack-step-x, 14px)), calc(var(--i) * var(--stack-step-y, -7px)), calc(var(--i) * var(--stack-step-z, 10px))) rotate(calc(var(--i) * .6deg)) scale(calc(.88 + var(--depth, 0) * .12));
+}
 @media (hover: hover) and (pointer: fine) {
-  .magazine-cover:hover {
+  #archiveArt[data-view='stacked'] .magazine-cover:hover {
     transform: translate3d(calc(var(--i) * var(--stack-step-x, 14px)), calc(var(--i) * var(--stack-step-y, -7px) - 20px), calc(var(--i) * var(--stack-step-z, 10px) + 30px)) rotate(-2deg) scale(1.06);
     z-index: 20; filter: saturate(1.15); opacity: 1;
+  }
+  #archiveArt[data-view='traditional'] .magazine-cover:hover,
+  #archiveArt[data-view='globe'] .magazine-cover:hover {
+    z-index: 20; filter: saturate(1.15);
   }
 }
 .cover-top, .cover-mark { font-family: var(--serif); font-size: 8px; letter-spacing: .08em; }

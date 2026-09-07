@@ -213,10 +213,10 @@ function sizeTraditionalView() {
   if (!artRect.width || !artRect.height) return;
   var aspect = 0.69;
   var vDenom = 0.5 + (rows - 1) * 1.15;
-  var wByHeight = (artRect.height * 0.44 / vDenom) * aspect;
+  var wByHeight = (artRect.height * 0.62 / vDenom) * aspect;
   var hDenom = 0.5 + Math.max(0, cols - 1) * 0.23;
-  var wByWidth = artRect.width * 0.43 / hDenom;
-  var w = Math.max(70, Math.min(wByHeight, wByWidth, 620));
+  var wByWidth = artRect.width * 0.6 / hDenom;
+  var w = Math.max(70, Math.min(wByHeight, wByWidth, 760));
   stack.style.setProperty("--trad-w", w + "px");
   stack.style.setProperty("--trad-cols", String(cols));
   stack.style.setProperty("--trad-rows", String(rows));
