@@ -1,11 +1,9 @@
-import os
 import re
 import time
 
 import joblib
-import numpy as np
 import pandas as pd
-import gradio as gr
+import streamlit as st
 import matplotlib
 
 matplotlib.use("Agg")
@@ -15,16 +13,16 @@ from urllib.parse import urlparse, parse_qs
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 
-try:
-    text_model = joblib.load("bot_text_model_v2.pkl")
-    tfidf = joblib.load("tfidf_vectorizer_v2.pkl")
-    HAS_MODEL = True
-except Exception:
-    text_model, tfidf, HAS_MODEL = None, None, False
+@st.cache_resource(show_spinner=False)
+def load_model():
+    try:
+        return joblib.load("bot_text_model_v2.pkl"), joblib.load("tfidf_vectorizer_v2.pkl"), True
+    except Exception:
+        return None, None, False
 
-youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY) if YOUTUBE_API_KEY else None
+
+text_model, tfidf, HAS_MODEL = load_model()
 
 
 def extract_video_id(url: str):
@@ -72,14 +70,21 @@ def spam_pattern_score(text):
     return min(score, 0.50)
 
 
-def fetch_comments(video_id, max_comments=1000):
+def normalize_text(text):
+    text = str(text).lower().strip()
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"[^\w\s]", "", text)
+    return text
+
+
+def fetch_comments(youtube_client, video_id, max_comments=1000):
     rows = []
     token = None
     fetched = 0
 
     while fetched < max_comments:
         try:
-            req = youtube.commentThreads().list(
+            req = youtube_client.commentThreads().list(
                 part="snippet,replies",
                 videoId=video_id,
                 maxResults=min(100, max_comments - fetched),
@@ -95,6 +100,8 @@ def fetch_comments(video_id, max_comments=1000):
                 raise ValueError("Video not found / invalid link.")
             if "quota" in msg.lower():
                 raise ValueError("YouTube API quota exceeded. Try later.")
+            if "API key not valid" in msg or "keyInvalid" in msg or e.resp.status in (400, 403):
+                raise ValueError("That API key was rejected by YouTube. Double-check it's a YouTube Data API v3 key with no restrictions blocking this app.")
             raise ValueError(f"YouTube API error: {e}")
 
         items = resp.get("items", [])
@@ -160,6 +167,25 @@ def score_comments(df):
     df = df.merge(acc[["author_channel_id", "account_risk_score"]], on="author_channel_id", how="left")
     df["account_risk_score"] = df["account_risk_score"].fillna(0.0)
 
+    df["norm_text"] = df["comment_text"].map(normalize_text)
+    df["text_len"] = df["comment_text"].str.len()
+    work = df[df["text_len"] >= 30].copy()
+    if len(work):
+        grouped = work.groupby("norm_text").agg(
+            unique_accounts=("author_channel_id", "nunique"),
+            comment_count=("comment_text", "count"),
+        ).reset_index()
+        dup_set = set(
+            grouped.loc[
+                (grouped["unique_accounts"] >= 2) & (grouped["comment_count"] >= 2),
+                "norm_text",
+            ].astype(str)
+        )
+    else:
+        dup_set = set()
+    df["coordination_score"] = df["norm_text"].isin(dup_set).astype(float) * 0.20
+    df = df.drop(columns=["norm_text", "text_len"])
+
     if HAS_MODEL:
         X = tfidf.transform(df["comment_text"].tolist())
         df["text_bot_prob"] = text_model.predict_proba(X)[:, 1]
@@ -185,11 +211,20 @@ def score_comments(df):
             return "High", 0.85, "Strong account farm risk"
         if len(text) < 20 and row["hard_scam"] == 0:
             return "Low", 0.05, "Short comment with no scam signal"
-        if row["text_suspicion"] == "strong" and (row["spam_pattern_score"] >= 0.20 or row["account_risk_score"] >= 0.30):
+        structural_support = (
+            row["spam_pattern_score"] >= 0.20
+            or row["account_risk_score"] >= 0.30
+            or row["coordination_score"] >= 0.20
+        )
+        if row["text_suspicion"] == "strong" and structural_support:
             return "High", 0.75, "Strong text suspicion + support"
         if row["text_suspicion"] in ["strong", "moderate"]:
             return "Medium", 0.45, "Text suspicion"
-        if row["spam_pattern_score"] >= 0.30 or row["account_risk_score"] >= 0.45:
+        if (
+            row["spam_pattern_score"] >= 0.30
+            or row["account_risk_score"] >= 0.45
+            or (row["coordination_score"] >= 0.20 and len(text) >= 30)
+        ):
             return "Medium", 0.35, "Structural signals"
         return "Low", 0.05, "No strong bot evidence"
 
@@ -209,76 +244,107 @@ def score_comments(df):
 def make_chart(df):
     counts = df["final_risk_level"].value_counts().reindex(["Low", "Medium", "High"]).fillna(0)
     fig, ax = plt.subplots(figsize=(5, 3))
-    ax.bar(counts.index, counts.values)
+    ax.bar(counts.index, counts.values, color=["#55735d", "#eea035", "#a43c34"])
     ax.set_title("Comment Risk Distribution")
     ax.set_ylabel("Count")
     plt.tight_layout()
     return fig
 
 
-def analyze(url, max_comments):
-    try:
-        if not youtube:
-            return "Set YOUTUBE_API_KEY environment variable first.", None, None, None
-        max_comments = int(max_comments)
-        if max_comments <= 0:
-            return "Max comments must be > 0", None, None, None
+def analyze(api_key, url, max_comments):
+    youtube = build("youtube", "v3", developerKey=api_key)
 
-        video_id = extract_video_id(url)
-        if not video_id:
-            return "Invalid YouTube link. Paste a full video URL.", None, None, None
+    max_comments = int(max_comments)
+    video_id = extract_video_id(url)
+    if not video_id:
+        raise ValueError("Invalid YouTube link. Paste a full video URL.")
 
-        df = fetch_comments(video_id, max_comments=max_comments)
-        if df is None or len(df) == 0:
-            return "No comments found (or comments unavailable).", None, None, None
+    df = fetch_comments(youtube, video_id, max_comments=max_comments)
+    if df is None or len(df) == 0:
+        raise ValueError("No comments found (or comments unavailable).")
 
-        scored = score_comments(df)
+    scored = score_comments(df)
 
-        total = len(scored)
-        low = (scored["final_risk_level"] == "Low").sum()
-        med = (scored["final_risk_level"] == "Medium").sum()
-        high = (scored["final_risk_level"] == "High").sum()
-        auth = round((low * 1.0 + med * 0.5 + high * 0.0) / total * 100, 2)
-        risk = "Low" if auth >= 85 else ("Medium" if auth >= 60 else "High")
+    total = len(scored)
+    low = (scored["final_risk_level"] == "Low").sum()
+    med = (scored["final_risk_level"] == "Medium").sum()
+    high = (scored["final_risk_level"] == "High").sum()
+    auth = round((low * 1.0 + med * 0.5 + high * 0.0) / total * 100, 2)
+    risk = "Low" if auth >= 85 else ("Medium" if auth >= 60 else "High")
 
-        summary = f"""
-### YouTube Comment Integrity Report
-- Video ID: `{video_id}`
-- Comments analyzed: **{total}** (requested {max_comments})
-- Genuine (Low): **{low}** ({round(100 * low / total, 2)}%)
-- Suspicious (Medium): **{med}** ({round(100 * med / total, 2)}%)
-- Bot/Spam (High): **{high}** ({round(100 * high / total, 2)}%)
-- Authenticity Score: **{auth}/100**
-- Video Risk: **{risk}**
-"""
+    top = scored.sort_values("final_risk_score", ascending=False)[
+        ["comment_text", "final_risk_level", "final_risk_score", "final_reasons"]
+    ].head(15)
 
-        top = scored.sort_values("final_risk_score", ascending=False)[
-            ["comment_text", "final_risk_level", "final_risk_score", "final_reasons"]
-        ].head(15)
-
-        chart = make_chart(scored)
-        return summary, chart, top, scored
-
-    except Exception as e:
-        return f"Error: {str(e)}", None, None, None
+    return {
+        "video_id": video_id, "total": total, "low": low, "med": med, "high": high,
+        "auth": auth, "risk": risk, "top": top, "scored": scored, "chart": make_chart(scored),
+    }
 
 
-with gr.Blocks(title="YouTube Comment Integrity Analyzer") as demo:
-    gr.Markdown("# YouTube Comment Integrity Analyzer")
-    gr.Markdown("Paste a YouTube link, set max comments, generate integrity report.")
+# ---------------------------------------------------------------- UI ------
 
-    with gr.Row():
-        url = gr.Textbox(label="YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
-        max_c = gr.Number(label="Max comments", value=1000, precision=0)
+st.set_page_config(page_title="Varuna — YouTube Comment Integrity Analyzer", page_icon="🛡️", layout="centered")
 
-    btn = gr.Button("Analyze", variant="primary")
+st.title("Varuna")
+st.caption("Paste a YouTube URL. Get a per-comment Low / Medium / High integrity report.")
 
-    out_md = gr.Markdown()
-    out_plot = gr.Plot()
-    out_table = gr.Dataframe()
-    out_full = gr.Dataframe(visible=False)
+with st.expander("🔑 Get a free YouTube Data API v3 key (~2 min)", expanded=not st.session_state.get("api_key")):
+    st.markdown(
+        "1. Open [console.cloud.google.com](https://console.cloud.google.com/) and create (or pick) a project.\n"
+        "2. **APIs & Services → Library** → search **YouTube Data API v3** → **Enable**.\n"
+        "3. **APIs & Services → Credentials → Create Credentials → API key** → copy it.\n"
+        "4. Paste it below.\n\n"
+        "Free tier: 10,000 quota units/day — one comment fetch costs 1 unit. "
+        "This app never stores, logs, or sends your key anywhere except Google's own API — it only lives "
+        "in this browser tab's session."
+    )
 
-    btn.click(analyze, inputs=[url, max_c], outputs=[out_md, out_plot, out_table, out_full])
+api_key = st.text_input(
+    "YouTube Data API v3 key",
+    type="password",
+    placeholder="AIza...",
+    help="Starts with \"AIza\". See the steps above if you don't have one yet — it's free.",
+    key="api_key",
+)
 
-if __name__ == "__main__":
-    demo.launch(share=True)
+url = st.text_input("YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
+max_comments = st.number_input("Max comments", min_value=10, max_value=5000, value=500, step=50)
+
+go = st.button("Analyze", type="primary", disabled=not (api_key and url))
+if not api_key:
+    st.info("Enter your API key above to enable analysis.")
+
+if go:
+    with st.spinner("Fetching and scoring comments…"):
+        try:
+            result = analyze(api_key, url, max_comments)
+        except ValueError as e:
+            st.error(str(e))
+            result = None
+        except Exception as e:
+            st.error(f"Unexpected error: {e}")
+            result = None
+
+    if result:
+        st.subheader("Integrity report")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Comments analyzed", result["total"])
+        c2.metric("Authenticity score", f'{result["auth"]}/100')
+        c3.metric("Video risk", result["risk"])
+        c4.metric("Bot/Spam (High)", f'{result["high"]} ({round(100 * result["high"] / result["total"], 1)}%)')
+
+        st.pyplot(result["chart"])
+
+        st.markdown("**Top 15 most suspicious comments**")
+        st.dataframe(result["top"], use_container_width=True)
+
+        st.download_button(
+            "Download full scored CSV",
+            result["scored"].to_csv(index=False).encode("utf-8"),
+            file_name=f'varuna_{result["video_id"]}.csv',
+            mime="text/csv",
+        )
+
+if not HAS_MODEL:
+    st.caption("Running heuristic-only (no trained model on disk) — account-farm, scam-regex and coordination signals still carry the run.")

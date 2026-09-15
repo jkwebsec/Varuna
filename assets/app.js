@@ -33,12 +33,11 @@ var BOOKS = [
     id: "account", kind: "component", palette: "orange",
     top: "03", title: "Account Farm", figure: "◉", mark: "ACCOUNT_RISK_SCORE",
     kicker: "Backend · pipeline stage 3 of 6", headline: "1.00", tag: "component", tagLabel: "backend component",
-    description: "Every comment's author_channel_id is aggregated across the fetched set: total comment volume, distinct videos commented on, and the ratio of unique text to total comments. The four conditions stack — a repeat poster who copy-pastes across multiple videos can hit the 1.0 cap easily.",
+    description: "Every comment's author_channel_id is aggregated on this one video: total comment volume and the ratio of unique text to total comments. The conditions stack — a repeat poster who copy-pastes hits the 1.0 cap fast.",
     facts: [
-      "videos_commented ≥ 3 → +0.40 · == 2 → +0.20",
-      "total_comments ≥ 10 → +0.25 · ≥ 5 → +0.15",
-      "unique_text_ratio ≤ 0.40 → +0.25 · ≤ 0.70 → +0.10",
-      "url_ratio ≥ 0.40 → +0.20"
+      "total_comments ≥ 10 → +0.35 · ≥ 5 → +0.20",
+      "unique_text_ratio ≤ 0.40 → +0.30",
+      "capped at 1.0 · missing channel id → 0.0"
     ]
   },
   {
@@ -149,6 +148,15 @@ var BOOKS = [
 
 var VIEW_LABELS = { globe: "Globe perspective", stacked: "Stacked perspective", traditional: "Traditional perspective" };
 
+/* =========================================================================
+   DEMO REEL — the one line to change.
+   Swap DEMO_VIDEO_URL for any YouTube link (youtu.be / watch?v= / shorts /
+   live / embed, tracking params like ?si= are fine) and the screening
+   section rebuilds itself: poster, caption, and embed all follow.
+   ========================================================================= */
+var DEMO_VIDEO_URL = "https://youtu.be/lJBcZHzgD7s?si=Ihdq7zJrdDsPh4aP";
+
+
 function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -180,6 +188,7 @@ BOOKS.forEach(function (book, index) {
   button.style.setProperty("--i", String(index));
   button.style.setProperty("--col", String(index % 5));
   button.style.setProperty("--row", String(Math.floor(index / 5)));
+  button.style.setProperty("--depth", String(index / Math.max(BOOKS.length - 1, 1)));
   button.innerHTML =
     '<span class="cover-top">' + esc(book.top) + '</span>' +
     '<strong>' + esc(book.title) + '</strong>' +
@@ -189,34 +198,99 @@ BOOKS.forEach(function (book, index) {
   stack.append(button);
 });
 
+/* ---- adaptive traditional grid --------------------------------------------
+   Fixed 5 columns squeeze cards to illegible 70px slivers on phones while
+   their inner content (icon glyphs, hairline rules) keeps fixed minimums —
+   the icons then burst out of the card (the reported mobile bug). So the
+   column count follows the panel: ≤460px → 3 cols, ≤720px → 4, else 5. */
+function tradColsFor(artWidth) {
+  if (artWidth <= 460) return 3;
+  if (artWidth <= 720) return 4;
+  return 5;
+}
+
+function layoutTraditionalGrid() {
+  var artRect = archiveArt.getBoundingClientRect();
+  var cols = tradColsFor(artRect.width || 800);
+  var covers = stack.children;
+  for (var k = 0; k < covers.length; k++) {
+    covers[k].style.setProperty("--col", String(k % cols));
+    covers[k].style.setProperty("--row", String(Math.floor(k / cols)));
+  }
+  return cols;
+}
+
 /* ---- traditional view: size the cascade so every row stays inside the
    panel, however many books there are and however small the viewport is.
-   Same transform formula as the reference (mod 5 columns × 23%, floor/5
-   rows × 115%, translate3d) — only the container's own width is solved for,
-   which in turn sets card height via the fixed .69 aspect ratio.
+   Same transform formula as the reference (col × 23%, row × 115%,
+   translate3d) — only the container's own width is solved for, which in
+   turn sets card height via the fixed .69 aspect ratio.
 
-   The container is vertically/horizontally centered on its OWN single-card
-   box (top:50%/left:53%), but the cascade only grows down-and-right from
-   that box by (rows-1)*115% / (cols-1)*23% of a card's own size — so the
-   true rendered bounds are asymmetric around the anchor, not the box. Solve
-   for the largest card size whose worst-case bound still lands inside the
-   panel. (At the reference's own hardcoded min(66%,450px), even its
-   original 10-cover/2-row case overflows most panel heights — this
-   generalizes correctly instead of copying that fragile constant.) */
+   The container is centered on its OWN single-card box, but the cascade
+   only grows down-and-right from that box — so the largest card size whose
+   worst-case bound still lands inside the panel is solved for. Floor is
+   92px: below that glyphs get cramped, so instead the panel grows taller
+   (minHeight below) and readability wins over fitting a short box. */
 function sizeTraditionalView() {
   if (currentView !== "traditional") return;
   var n = BOOKS.length;
-  var rows = Math.ceil(n / 5);
-  var cols = Math.min(5, n);
   var artRect = archiveArt.getBoundingClientRect();
   if (!artRect.width || !artRect.height) return;
+  var cols = Math.min(layoutTraditionalGrid(), n);
+  var rows = Math.ceil(n / cols);
   var aspect = 0.69;
+  var narrow = artRect.width < 520;
+  /* narrow panels: pack tighter (0.80 fill) and cap cards at 100px —
+     a 13-cover grid is inherently tall on phones; this keeps the panel
+     near ~2 phone screens instead of ~3 while staying readable */
+  var fill = narrow ? 0.80 : 0.62;
+  var cap = narrow ? 100 : 760;
   var vDenom = 0.5 + (rows - 1) * 1.15;
-  var wByHeight = (artRect.height * 0.44 / vDenom) * aspect;
+  var wByHeight = (artRect.height * fill / vDenom) * aspect;
   var hDenom = 0.5 + Math.max(0, cols - 1) * 0.23;
-  var wByWidth = artRect.width * 0.43 / hDenom;
-  var w = Math.max(70, Math.min(wByHeight, wByWidth, 620));
+  var wByWidth = artRect.width * 0.6 / hDenom;
+  var w = Math.min(wByHeight, wByWidth, cap);
+  if (w < 92) {
+    w = Math.min(narrow ? 100 : 120, (artRect.width * 0.72) / hDenom, cap);
+    var needH = Math.ceil(((w / aspect) * vDenom) / fill + 40);
+    archiveArt.style.minHeight = Math.max(artRect.height, needH) + "px";
+  } else {
+    archiveArt.style.minHeight = "";
+  }
+  w = Math.max(64, w);
   stack.style.setProperty("--trad-w", w + "px");
+  stack.style.setProperty("--trad-cols", String(cols));
+  stack.style.setProperty("--trad-rows", String(rows));
+}
+
+/* ---- stacked view: scale the perspective cascade to the panel and center
+   the whole fanned block (not just its first card) inside it. Same shape as
+   the reference's per-card translate3d/rotate, but the step size shrinks on
+   narrow panels instead of overflowing, and the container shift is solved
+   from the actual step so the cascade's midpoint — not its first card —
+   lands on the panel's center. */
+function sizeStackedView() {
+  if (currentView !== "stacked") return;
+  var n = BOOKS.length;
+  var artRect = archiveArt.getBoundingClientRect();
+  var cardRect = stack.getBoundingClientRect();
+  if (!artRect.width || !cardRect.width) return;
+  /* reserve the card itself plus breathing room: the old fixed 0.3 budget
+     ignored card width, so on narrow panels card + cascade clipped right */
+  var pad = 28;
+  var budgetX = Math.max(0, artRect.width - cardRect.width * 1.18 - pad);
+  var stepX = Math.max(4, Math.min(14, budgetX / Math.max(n - 1, 1)));
+  var ratio = stepX / 14;
+  var stepY = 7 * ratio;
+  /* cap the total vertical rise so the back of the fan never leaves the top */
+  var maxRise = artRect.height * 0.30;
+  if (stepY * (n - 1) > maxRise) stepY = Math.max(2, maxRise / Math.max(n - 1, 1));
+  var stepZ = 10 * ratio;
+  stack.style.setProperty("--stack-step-x", stepX + "px");
+  stack.style.setProperty("--stack-step-y", "-" + stepY + "px");
+  stack.style.setProperty("--stack-step-z", stepZ + "px");
+  stack.style.setProperty("--stack-shift-x", ((n - 1) * stepX / 2) + "px");
+  stack.style.setProperty("--stack-shift-y", ((n - 1) * stepY / 2) + "px");
 }
 
 /* ---- globe view: scale the arc's spread to the panel, not a fixed viewport.
@@ -235,8 +309,10 @@ function sizeGlobeView() {
   var budget = artRect.width * 0.36 - cardRect.width * 0.75;
   var step = Math.max(4, Math.min(33, budget / Math.max(center, 1)));
   var ratio = step / 33;
+  /* cap arc height to short panels so top/bottom covers never clip */
+  var amp = Math.min(45 * ratio, artRect.height * 0.14);
   stack.style.setProperty("--globe-step", step + "px");
-  stack.style.setProperty("--globe-amp", (45 * ratio) + "px");
+  stack.style.setProperty("--globe-amp", amp + "px");
   stack.style.setProperty("--globe-z", (3 * ratio) + "px");
   stack.style.setProperty("--globe-rot", (7 * ratio) + "deg");
 }
@@ -321,12 +397,18 @@ document.querySelectorAll(".view-button").forEach(function (button) {
     if (!archiveFrame.classList.contains("is-expanded")) {
       selectionLabel.textContent = VIEW_LABELS[view];
     }
+    /* traditional grows the panel (minHeight) on short screens — release it
+       when leaving so stacked/globe re-center in the natural panel */
+    if (view !== "traditional") archiveArt.style.minHeight = "";
     if (view === "traditional") sizeTraditionalView();
     if (view === "globe") sizeGlobeView();
+    if (view === "stacked") sizeStackedView();
   });
 });
 
-window.addEventListener("resize", function () { sizeTraditionalView(); sizeGlobeView(); }, { passive: true });
+window.addEventListener("resize", function () { sizeTraditionalView(); sizeGlobeView(); sizeStackedView(); }, { passive: true });
+layoutTraditionalGrid();
+sizeStackedView();
 
 /* ---- pointer parallax — fine pointers only, never on touch/coarse ------ */
 archiveArt.addEventListener("pointermove", function (event) {
@@ -336,6 +418,8 @@ archiveArt.addEventListener("pointermove", function (event) {
   var y = (event.clientY - bounds.top) / bounds.height - 0.5;
   archiveArt.style.setProperty("--pointer-x", (x * 5) + "deg");
   archiveArt.style.setProperty("--pointer-y", (y * -4) + "deg");
+  archiveArt.style.setProperty("--mx", ((x + 0.5) * 100) + "%");
+  archiveArt.style.setProperty("--my", ((y + 0.5) * 100) + "%");
 });
 archiveArt.addEventListener("pointerleave", function () {
   archiveArt.style.setProperty("--pointer-x", "0deg");
@@ -394,9 +478,18 @@ document.querySelectorAll(".copy-btn").forEach(function (btn) {
 var siteNav = document.querySelector("nav");
 var stageEl = document.querySelector(".stage");
 var navLinks = document.querySelectorAll(".nav-links a");
+var navPill = document.querySelector(".nav-pill");
 var sections = Array.prototype.map.call(navLinks, function (a) {
   return document.querySelector(a.getAttribute("href"));
 });
+
+/* fluid sliding indicator under the active nav link, Apple-tab-bar style */
+function moveNavPill(link) {
+  if (!navPill || !link) return;
+  navPill.style.opacity = "1";
+  navPill.style.transform = "translateX(" + link.offsetLeft + "px)";
+  navPill.style.width = link.offsetWidth + "px";
+}
 
 function onScroll() {
   var trigger = stageEl ? stageEl.offsetHeight * 0.65 : 400;
@@ -407,12 +500,47 @@ function onScroll() {
   sections.forEach(function (sec) {
     if (sec && sec.offsetTop <= pos) current = sec;
   });
+  var activeLink = null;
   navLinks.forEach(function (a) {
-    a.classList.toggle("active", current && a.getAttribute("href") === "#" + current.id);
+    var isActive = current && a.getAttribute("href") === "#" + current.id;
+    a.classList.toggle("active", isActive);
+    if (isActive) activeLink = a;
   });
+  moveNavPill(activeLink);
 }
 window.addEventListener("scroll", onScroll, { passive: true });
+window.addEventListener("resize", function () { moveNavPill(document.querySelector(".nav-links a.active")); }, { passive: true });
 onScroll();
+
+/* ---- masthead stat counters: count up to value once revealed -------------- */
+function animateCount(el) {
+  var raw = el.textContent.trim();
+  var match = raw.match(/^(\d+)/);
+  if (!match || reduceMotion.matches) return;
+  var target = parseInt(match[1], 10);
+  var suffix = raw.slice(match[1].length);
+  var start = performance.now();
+  var duration = 900;
+  function tick(now) {
+    var t = Math.min(1, (now - start) / duration);
+    var eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(target * eased) + suffix;
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+var mastheadObserver = new IntersectionObserver(
+  function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        animateCount(entry.target);
+        mastheadObserver.unobserve(entry.target);
+      }
+    });
+  },
+  { threshold: 0.6 }
+);
+document.querySelectorAll(".mstat .num").forEach(function (el) { mastheadObserver.observe(el); });
 
 /* ---- reveal on scroll ------------------------------------------------------ */
 var observer = new IntersectionObserver(
@@ -427,3 +555,237 @@ var observer = new IntersectionObserver(
   { threshold: 0.08 }
 );
 document.querySelectorAll(".reveal").forEach(function (el) { observer.observe(el); });
+
+/* ---- demo reel: poster → click to play → embed ----------------------------- */
+function youTubeId(url) {
+  if (!url) return null;
+  var m = String(url).match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/))([A-Za-z0-9_-]{11})/
+  );
+  return m ? m[1] : null;
+}
+
+function loadCinema() {
+  var cinema = document.getElementById("cinema");
+  var stage = document.getElementById("cinemaStage");
+  var meta = document.getElementById("cinemaMeta");
+  var caption = document.getElementById("cinemaCaption");
+  var replayBtn = document.getElementById("cinemaReplay");
+  if (!cinema || !stage) return;
+
+  var id = youTubeId(DEMO_VIDEO_URL);
+
+  if (!id) {
+    cinema.classList.add("is-bad");
+    if (meta) meta.textContent = "no playable id";
+    if (caption) caption.textContent = "couldn’t read a YouTube id from the configured link";
+    var bad = document.createElement("div");
+    bad.className = "cinema-bad";
+    bad.innerHTML =
+      '<span>No reel to screen — the configured link has no YouTube id.</span>' +
+      '<span class="bd-code">' + esc(DEMO_VIDEO_URL || "(empty)") + "</span>";
+    var screenEl = document.getElementById("cinemaScreen");
+    (screenEl || stage.parentNode).appendChild(bad);
+    return;
+  }
+
+  if (meta) meta.textContent = id + " · 16:9 · youtube";
+  if (caption) caption.textContent = "still · click the reel to roll";
+
+  /* YouTube refuses to play inline when the page has no http referer (e.g. it
+     is opened straight from disk as file://). If that is how this page is being
+     viewed, surface the fix instead of letting the player silently degrade to
+     a "Watch on YouTube" screen. */
+  var openedFromDisk = window.location.protocol === "file:";
+  if (openedFromDisk) {
+    cinema.classList.add("is-bad");
+    if (meta) meta.textContent = "file:// — embeds blocked by YouTube";
+    if (caption) caption.textContent = "serve over http://localhost, then the reel plays here";
+    var diskHint = document.createElement("div");
+    diskHint.className = "cinema-bad";
+    diskHint.innerHTML =
+      "<span>YouTube won’t play inside a page opened from disk.</span>" +
+      '<span class="bd-code">cd ' + esc("yt-authentic") + " && python3 -m http.server 8000</span>" +
+      '<span class="bd-code">then open http://localhost:8000</span>';
+    var screenEl0 = document.getElementById("cinemaScreen");
+    (screenEl0 || stage.parentNode).appendChild(diskHint);
+    return;
+  }
+
+  /* poster stage */
+  var poster = document.createElement("img");
+  poster.className = "cinema-poster";
+  poster.alt = "Poster frame of the Varuna demonstration video";
+  poster.loading = "lazy";
+  poster.onerror = function () {
+    if (poster.src.indexOf("hqdefault") === -1) {
+      poster.src = "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
+    } else {
+      poster.style.display = "none";
+      stage.classList.add("has-poster-fallback");
+    }
+  };
+  poster.src = "https://i.ytimg.com/vi/" + id + "/maxresdefault.jpg";
+
+  var veil = document.createElement("div");
+  veil.className = "cinema-veil";
+
+  var play = document.createElement("button");
+  play.className = "cinema-play";
+  play.type = "button";
+  play.setAttribute("aria-label", "Play the demonstration video");
+  play.innerHTML = '<span class="play-glyph" aria-hidden="true"></span>';
+
+  var note = document.createElement("div");
+  note.className = "cinema-note";
+  note.innerHTML =
+    '<span class="shot">shot 01 · live run</span>' +
+    '<span class="id">' + esc(id) + "</span>";
+
+  stage.appendChild(poster);
+  stage.appendChild(veil);
+  stage.appendChild(play);
+  stage.appendChild(note);
+
+  var hostEl = null;
+  var player = null;
+  var failed = false;
+
+  /* YT.Player replaces the host element with an <iframe>; after destroy() the
+     host is gone, so re-create it whenever playback is (re)started. */
+  function ensureHost() {
+    if (hostEl && hostEl.isConnected) return hostEl;
+    var fresh = document.createElement("div");
+    fresh.className = "cinema-embed-host";
+    fresh.id = "cinemaHost";
+    stage.appendChild(fresh);
+    hostEl = fresh;
+    return hostEl;
+  }
+
+  function destroyPlayer() {
+    if (player) {
+      try { player.destroy(); } catch (e) {}
+      player = null;
+    }
+    if (hostEl && hostEl.isConnected) {
+      try { hostEl.remove(); } catch (e2) {}
+    }
+    hostEl = null;
+  }
+
+  function showBlocked(code) {
+    if (failed) return;
+    failed = true;
+    destroyPlayer();
+    cinema.classList.add("is-owner-blocked");
+    if (caption) caption.textContent = "embedding blocked by the video owner";
+    var overlay = document.createElement("div");
+    overlay.className = "cinema-owner-blocked";
+    var msg =
+      code === 100 || code === 2
+        ? "This video can’t be played here."
+        : "This video’s owner has blocked embedding.";
+    overlay.innerHTML =
+      "<span>" + msg + "</span>" +
+      '<a class="owner-link" href="' + esc(DEMO_VIDEO_URL) + '" target="_blank" rel="noreferrer noopener">Watch on YouTube ↗</a>' +
+      '<span class="owner-hint">swap DEMO_VIDEO_URL in assets/app.js to feature another reel</span>';
+    stage.appendChild(overlay);
+    if (replayBtn) { replayBtn.hidden = true; replayBtn.disabled = true; }
+  }
+
+  function startPlayback() {
+    if (failed) return;
+    ensureHost();
+    var watchdog = setTimeout(function () {
+      if (!player && !failed) showBlocked(2);
+    }, 6000);
+    loadYouTubeAPI(function () {
+      if (failed) return;
+      try {
+        player = new YT.Player(hostEl, {
+          width: "100%",
+          height: "100%",
+          videoId: id,
+          playerVars: { autoplay: 1, playsinline: 1, rel: 0, color: "white" },
+          events: {
+            onReady: function (event) {
+              clearTimeout(watchdog);
+              if (!failed) {
+                var why = 0;
+                try {
+                  var vd = event.target.getVideoData && event.target.getVideoData();
+                  why = vd && vd.video_id ? 0 : 2;
+                } catch (e2) {}
+                if (why === 0) {
+                  try { event.target.playVideo(); } catch (e3) {}
+                  cinema.classList.add("is-playing");
+                  play.style.display = "none";
+                  note.style.display = "none";
+                  if (caption) caption.textContent = "rolling · the full run, start to finish";
+                  if (replayBtn) { replayBtn.hidden = false; replayBtn.disabled = false; }
+                } else {
+                  showBlocked(2);
+                }
+              }
+            },
+            onStateChange: function (event) {
+              if (event.data === YT.PlayerState.PLAYING && cinema && !cinema.classList.contains("is-playing")) {
+                cinema.classList.add("is-playing");
+                play.style.display = "none";
+                note.style.display = "none";
+                if (caption) caption.textContent = "rolling · the full run, start to finish";
+                if (replayBtn) { replayBtn.hidden = false; replayBtn.disabled = false; }
+              }
+            },
+            onError: function (event) {
+              clearTimeout(watchdog);
+              showBlocked(event.data);
+            }
+          }
+        });
+      } catch (err) {
+        clearTimeout(watchdog);
+        showBlocked(2);
+      }
+    });
+  }
+
+  play.addEventListener("click", startPlayback);
+
+  if (replayBtn) {
+    replayBtn.addEventListener("click", function () {
+      destroyPlayer();
+      failed = false;
+      cinema.classList.remove("is-playing");
+      cinema.classList.remove("is-owner-blocked");
+      var wreck2 = stage.querySelector(".cinema-owner-blocked");
+      if (wreck2) wreck2.remove();
+      play.style.display = "";
+      note.style.display = "";
+      if (caption) caption.textContent = "still · click the reel to roll";
+      replayBtn.disabled = true;
+      replayBtn.hidden = true;
+    });
+  }
+}
+
+/* ---- YouTube IFrame API loader (official, gives us real onError codes) ----- */
+function loadYouTubeAPI(cb) {
+  if (window.YT && window.YT.Player) { cb(); return; }
+  if (window.__ytApiCallbacks) { window.__ytApiCallbacks.push(cb); return; }
+  window.__ytApiCallbacks = [cb];
+  var prev = window.onYouTubeIframeAPIReady;
+  window.onYouTubeIframeAPIReady = function () {
+    if (prev) prev();
+    (window.__ytApiCallbacks || []).forEach(function (fn) { fn(); });
+    window.__ytApiCallbacks = [];
+  };
+  var script = document.createElement("script");
+  script.src = "https://www.youtube.com/iframe_api";
+  script.async = true;
+  document.head.appendChild(script);
+}
+
+loadCinema();
+
