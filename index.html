@@ -14,6 +14,7 @@
   <div class="nav-inner">
     <span class="logo">Varuna<span class="tick">_</span></span>
     <div class="nav-links">
+      <span class="nav-pill" aria-hidden="true"></span>
       <a href="#overview">overview</a>
       <a href="#architecture">architecture</a>
       <a href="#scoring">scoring</a>
@@ -40,7 +41,8 @@
       per-video Authenticity Score — bot-text classifier, account-farm heuristics, scam regexes and
       coordination detection, fused into one decision ladder.</p>
       <div class="rail-cta">
-        <a class="btn primary" href="#replicate">Replicate in ~5 min<span>↓</span></a>
+        <a class="btn primary" href="https://YOUR-APP-NAME.streamlit.app" rel="noreferrer" target="_blank">Try it live<span>↗</span></a>
+        <a class="btn" href="#replicate">Replicate in ~5 min<span>↓</span></a>
         <a class="btn" href="https://github.com/jkwebsec/Varuna" rel="noreferrer" target="_blank">View on GitHub<span>↗</span></a>
       </div>
 
@@ -118,8 +120,8 @@
     <div class="card reveal">
       <span class="icon">acct</span>
       <h3>Account-farm heuristics</h3>
-      <p>Per <code>author_channel_id</code> aggregation: comment volume, distinct videos, unique-text
-      ratio, URL ratio → one <code>account_risk_score</code> in [0, 1].</p>
+      <p>Per <code>author_channel_id</code> aggregation on this video: comment volume, unique-text
+      ratio → one <code>account_risk_score</code> in [0, 1].</p>
       <ul>
         <li>volume spammer: ≥10 comments → +0.35</li>
         <li>copy-paste account: unique-ratio ≤0.4 → +0.30</li>
@@ -196,7 +198,7 @@
     <div class="flow-rule"></div>
     <div class="flow-row">
       <div class="flow-box"><div class="fn">Integrity Report</div><div class="sub">markdown + chart + top-15 + full df</div></div>
-      <div class="flow-box"><div class="fn">Gradio UI</div><div class="sub">share=True or localhost:7860</div></div>
+      <div class="flow-box"><div class="fn">Streamlit UI</div><div class="sub">localhost:8501 or *.streamlit.app</div></div>
     </div>
   </div>
 
@@ -204,9 +206,9 @@
     <div class="cb-head"><span>Signal fusion — the same pipeline, condensed</span></div>
     <pre><code><span class="c"># signal fusion, condensed</span>
 text_bot_prob      → suspicion: strong ≥0.85 · moderate ≥0.60 · weak ≥0.40
-account_risk_score → farm risk:  ≥0.60 High · ≥0.45 Medium · ≥0.30 supports
+account_risk_score → farm risk:  ≥10 comments +0.35 · unique≤0.40 +0.30 · ≥0.60 High · ≥0.45 Medium · ≥0.30 supports
 spam_pattern_score → scam bait:  ≥0.30 Medium · ≥0.20 supports
-coordination_score → brigade:    ≥0.20 (with ≥30 chars) supports
+coordination_score → brigade:    ≥0.20 (needs ≥30 chars) supports rule 4 · structural for rule 6
 
 decide(): hard_scam → High 0.90
           account_risk ≥0.60 → High 0.85
@@ -233,13 +235,9 @@ decide(): hard_scam → High 0.90
   <div class="ledger reveal">
   <table>
     <tr><th>condition</th><th>points</th><th>rationale</th></tr>
-    <tr><td><code>videos_commented ≥ 3</code></td><td>+0.40</td><td>spams across many videos — classic farm behavior</td></tr>
-    <tr><td><code>videos_commented == 2</code></td><td>+0.20</td><td>weaker version of the above</td></tr>
-    <tr><td><code>total_comments ≥ 10</code></td><td>+0.25</td><td>volume, not conversation</td></tr>
-    <tr><td><code>total_comments ≥ 5</code></td><td>+0.15</td><td>partial volume</td></tr>
-    <tr><td><code>unique_text_ratio ≤ 0.40</code></td><td>+0.25</td><td>copy-pasted text (unique ÷ total comments)</td></tr>
-    <tr><td><code>unique_text_ratio ≤ 0.70</code></td><td>+0.10</td><td>mild repetition</td></tr>
-    <tr><td><code>url_ratio ≥ 0.40</code></td><td>+0.20</td><td>40%+ of comments carry links</td></tr>
+    <tr><td><code>total_comments ≥ 10</code></td><td>+0.35</td><td>volume, not conversation, on this one video</td></tr>
+    <tr><td><code>total_comments ≥ 5</code></td><td>+0.20</td><td>partial volume</td></tr>
+    <tr><td><code>unique_text_ratio ≤ 0.40</code></td><td>+0.30</td><td>copy-pasted text (unique ÷ total comments)</td></tr>
   </table>
   </div>
 
@@ -279,9 +277,9 @@ decide(): hard_scam → High 0.90
     <tr><td>1</td><td><code>hard_scam == 1</code></td><td><span class="tag high">High</span></td><td>0.90</td><td>Hard scam/contact pattern</td></tr>
     <tr><td>2</td><td><code>account_risk_score ≥ 0.60</code></td><td><span class="tag high">High</span></td><td>0.85</td><td>Strong account farm risk</td></tr>
     <tr><td>3</td><td><code>len &lt; 20</code> and no scam flag</td><td><span class="tag low">Low</span></td><td>0.05</td><td>Short comment with no scam signal</td></tr>
-    <tr><td>4</td><td>strong suspicion AND (spam ≥0.20 OR account ≥0.30)</td><td><span class="tag high">High</span></td><td>0.75</td><td>Strong text suspicion + support</td></tr>
+    <tr><td>4</td><td>strong suspicion AND (spam ≥0.20 OR account ≥0.30 OR coord ≥0.20)</td><td><span class="tag high">High</span></td><td>0.75</td><td>Strong text suspicion + support</td></tr>
     <tr><td>5</td><td>suspicion in {strong, moderate}</td><td><span class="tag med">Medium</span></td><td>0.45</td><td>Text suspicion</td></tr>
-    <tr><td>6</td><td>spam ≥0.30 OR account ≥0.45</td><td><span class="tag med">Medium</span></td><td>0.35</td><td>Structural signals</td></tr>
+    <tr><td>6</td><td>spam ≥0.30 OR account ≥0.45 OR (coord ≥0.20 AND len ≥30)</td><td><span class="tag med">Medium</span></td><td>0.35</td><td>Structural signals</td></tr>
     <tr><td>7</td><td>fallback</td><td><span class="tag low">Low</span></td><td>0.05</td><td>No strong bot evidence</td></tr>
   </table>
   </div>
@@ -299,8 +297,9 @@ decide(): hard_scam → High 0.90
     <span class="eyebrow">Demo</span>
     <div>
       <h2>The UI</h2>
-      <p>Gradio, zero frontend code. URL in → markdown report + distribution chart + top-15 suspicious
-      table out. Screenshot from a live run.</p>
+      <p>Streamlit, zero frontend code. Paste your own API key + a URL in → markdown report + distribution
+      chart + top-15 suspicious table out. Screenshot from a live run.</p>
+      <a class="btn primary" href="https://YOUR-APP-NAME.streamlit.app" rel="noreferrer" target="_blank" style="margin-top:14px">Try it live<span>↗</span></a>
     </div>
   </div>
 
@@ -310,11 +309,12 @@ decide(): hard_scam → High 0.90
       <span class="transcript-title">zsh — Varuna</span>
     </div>
     <div class="transcript-body">
-<span class="prompt">$</span> <span class="cmd">export YOUTUBE_API_KEY="AIza..."</span><br>
-<span class="prompt">$</span> <span class="cmd">python app.py</span><br>
-<span class="out">Running on local URL: http://127.0.0.1:7860</span><br>
+<span class="prompt">$</span> <span class="cmd">streamlit run app.py</span><br>
+<span class="out">You can now view your Streamlit app in your browser.</span><br>
+<span class="out">Local URL: http://localhost:8501</span><br>
 <br>
-<span class="prompt">$</span> <span class="cmd">analyze("https://youtu.be/dQw4w9WgXcQ", max_comments=1000)</span><br>
+<span class="out"># paste your own API key in the app, then analyze:</span><br>
+<span class="prompt">$</span> <span class="cmd">analyze(api_key, "https://youtu.be/dQw4w9WgXcQ", max_comments=1000)</span><br>
 <span class="out">comments fetched ......................... 1000</span><br>
 <span class="out">scored (text + account + spam + coord) ... 1000</span><br>
 <span class="out">─────────────────────────────────────────────────</span><br>
@@ -329,9 +329,9 @@ decide(): hard_scam → High 0.90
   <div class="plate reveal">
     <div class="plate-bar">
       <span class="mark"></span><span class="mark"></span><span class="mark"></span>
-      <span class="plate-url">https://localhost:7860/ — YouTube Comment Integrity Analyzer</span>
+      <span class="plate-url">http://localhost:8501/ — YouTube Comment Integrity Analyzer</span>
     </div>
-    <img src="assets/app-screenshot.png" alt="yt-authentic Gradio UI — integrity report output" loading="lazy">
+    <img src="assets/app-screenshot.png" alt="yt-authentic Streamlit UI — integrity report output" loading="lazy">
   </div>
   <div class="plate-caption reveal">
     <p>A live run over 1,000 comments: 994 Low, 6 Medium, 0 High — Authenticity Score 99.7/100,
@@ -420,15 +420,12 @@ pip install -r requirements.txt</code></pre>
   <div class="step reveal">
     <div class="step-num">3</div>
     <div class="step-body">
-      <h3>Set the key</h3>
-      <div class="codeblock">
-        <div class="cb-head"><span>bash / PowerShell</span><button class="copy-btn" type="button">copy</button></div>
-        <pre><code><span class="c"># macOS / Linux</span>
-export YOUTUBE_API_KEY="AIza..."          <span class="c"># ← paste your key</span>
-
-<span class="c"># Windows PowerShell</span>
-$env:YOUTUBE_API_KEY="AIza..."</code></pre>
-      </div>
+      <h3>No env var to set</h3>
+      <p>Unlike a lot of API demos, your key never touches a terminal or a
+      <code>.env</code> file. The app itself asks for it — paste it into the
+      <b>YouTube Data API v3 key</b> field once it's running (step 4). It stays in
+      that browser tab's session only: never written to disk, never logged, never
+      shared with anyone but Google's own API.</p>
     </div>
   </div>
 
@@ -438,10 +435,11 @@ $env:YOUTUBE_API_KEY="AIza..."</code></pre>
       <h3>Run</h3>
       <div class="codeblock">
         <div class="cb-head"><span>bash</span><button class="copy-btn" type="button">copy</button></div>
-        <pre><code>python app.py
-<span class="c"># → Running on local URL: http://127.0.0.1:7860</span></code></pre>
+        <pre><code>streamlit run app.py
+<span class="c"># → Local URL: http://localhost:8501</span></code></pre>
       </div>
-      <p style="margin-top:12px">Open <code>http://127.0.0.1:7860</code>, paste any YouTube URL, set
+      <p style="margin-top:12px">Open <code>http://localhost:8501</code>, paste your YouTube API key
+      (with a link to get one, right there in the app), paste any YouTube URL, set
       <code>max comments</code>, hit <b>Analyze</b>. Done. No model file? It still works — the three
       structural signals carry the run (heuristic-only mode).</p>
     </div>
@@ -494,15 +492,29 @@ git push -u origin main</code></pre>
     </div>
   </div>
 
+  <div class="step reveal">
+    <div class="step-num">8</div>
+    <div class="step-body">
+      <h3>Deploy the interactive app (optional)</h3>
+      <p>GitHub Pages only serves static files — it can't run <code>app.py</code>.
+      For a live, clickable demo (not just <code>streamlit run</code> on your laptop),
+      deploy free on <a href="https://streamlit.io/cloud" rel="noreferrer" target="_blank">Streamlit
+      Community Cloud</a>: sign in with GitHub → <b>New app</b> → pick this repo/branch → main file
+      <code>app.py</code> → Deploy. You get a public <code>*.streamlit.app</code> URL — every visitor
+      still pastes in their own key, nothing is shared server-side.</p>
+    </div>
+  </div>
+
   <h3 class="sub">Troubleshooting — error → fix</h3>
   <div class="ledger reveal">
   <table>
     <tr><th>you see</th><th>cause</th><th>fix</th></tr>
-    <tr><td><code>Set YOUTUBE_API_KEY environment variable first.</code></td><td>key not exported, or new terminal</td><td>re-run step 3, then restart <code>app.py</code></td></tr>
+    <tr><td><code>That API key was rejected by YouTube.</code></td><td>invalid key, or restricted to a referrer/IP</td><td>use a plain YouTube Data API v3 key with no HTTP-referrer restriction</td></tr>
     <tr><td><code>YouTube API quota exceeded. Try later.</code></td><td>10,000 units/day used up</td><td>wait for UTC reset, or use a second project</td></tr>
     <tr><td><code>Comments are disabled on this video.</code></td><td>video has comments off</td><td>pick another video — app is working correctly</td></tr>
     <tr><td><code>Video not found / invalid link.</code></td><td>bad URL / private video</td><td>paste the full <code>watch?v=</code> URL</td></tr>
     <tr><td>everything is "Low", no model output</td><td><code>HAS_MODEL=False</code></td><td>do step 5, or accept heuristic-only mode</td></tr>
+    <tr><td><b>Analyze</b> button stays greyed out</td><td>key or URL field still empty</td><td>fill in both — the button enables itself</td></tr>
     <tr><td>403 on the API key</td><td>API key restrictions misconfigured</td><td>key → Edit → API restrictions → allow <b>YouTube Data API v3</b></td></tr>
   </table>
   </div>
@@ -538,7 +550,7 @@ git push -u origin main</code></pre>
     <span class="badge"><b>LightGBM</b> classifier</span>
     <span class="badge"><b>scikit-learn</b> TF-IDF</span>
     <span class="badge"><b>YouTube Data API v3</b></span>
-    <span class="badge"><b>Gradio</b> UI</span>
+    <span class="badge"><b>Streamlit</b> UI</span>
     <span class="badge"><b>pandas / numpy</b></span>
     <span class="badge"><b>matplotlib</b></span>
     <span class="badge"><b>regex</b> heuristics</span>

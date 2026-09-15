@@ -26,6 +26,10 @@
   --sans: Arial, Helvetica, sans-serif;
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
 
+  /* Apple-spring easing for the whole stage: quick to start, soft to land */
+  --ease-spring: cubic-bezier(.32, .72, 0, 1);
+  --ease-snap: cubic-bezier(.2, .8, .2, 1);
+
   color: var(--ink);
   background: var(--paper);
   font-family: var(--sans);
@@ -67,11 +71,12 @@ th {
    ========================================================================= */
 nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 60;
-  background: rgba(243, 243, 241, .94);
+  background: rgba(243, 243, 241, .72);
   border-bottom: 1px solid var(--rule);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5);
   transform: translateY(-101%);
-  transition: transform .35s cubic-bezier(.2,.8,.2,1);
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  transition: transform .45s var(--ease-spring), background .3s;
+  -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
 }
 nav.is-stuck { transform: none; }
 .nav-inner {
@@ -80,15 +85,22 @@ nav.is-stuck { transform: none; }
 }
 .logo { font-family: var(--serif); font-size: 17px; letter-spacing: -.07em; white-space: nowrap; }
 .logo .tick { color: var(--muted); }
-.nav-links { display: flex; gap: 18px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+.nav-links { position: relative; display: flex; gap: 18px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
 .nav-links::-webkit-scrollbar { display: none; }
+.nav-pill {
+  position: absolute; left: 0; bottom: 0; height: 1px; width: 0;
+  background: var(--ink); pointer-events: none;
+  transform: translateX(0); transition: transform .45s var(--ease-spring), width .45s var(--ease-spring), opacity .25s;
+  opacity: 0;
+}
 .nav-links a {
+  position: relative; z-index: 1;
   font-size: 9px; letter-spacing: .11em; text-transform: uppercase;
   color: var(--muted); white-space: nowrap; padding: 4px 0;
-  border-bottom: 1px solid transparent; transition: color .2s, border-color .2s;
+  border-bottom: 1px solid transparent; transition: color .25s;
 }
 .nav-links a:hover { color: var(--ink); }
-.nav-links a.active { color: var(--ink); border-bottom-color: var(--ink); }
+.nav-links a.active { color: var(--ink); }
 
 /* =========================================================================
    STAGE — matches the reference's .archive-frame 1:1 (class names, mechanics)
@@ -127,37 +139,58 @@ nav.is-stuck { transform: none; }
 }
 .rail-cta { display: flex; flex-direction: column; gap: 7px; margin-top: 18px; }
 .btn {
+  position: relative; overflow: hidden;
   display: inline-flex; align-items: center; justify-content: space-between; gap: 10px;
   height: 34px; padding: 0 12px; border: 1px solid var(--rule); background: var(--card);
-  font-size: 9px; font-weight: 700; transition: background .2s, color .2s, transform .2s;
+  font-size: 9px; font-weight: 700; transition: background .2s ease, color .2s ease, transform .25s var(--ease-spring);
 }
 .btn span { font-size: 12px; letter-spacing: 0; }
 .btn:hover { background: var(--hair); transform: translateX(3px); }
+.btn:active { transform: translateX(3px) scale(.96); transition-duration: .12s; }
 .btn.primary { color: var(--card); background: var(--rule); }
 .btn.primary:hover { background: #000; }
+.btn.primary::after {
+  content: ''; position: absolute; top: 0; left: -75%; width: 45%; height: 100%;
+  background: linear-gradient(115deg, transparent, rgba(255,255,255,.28), transparent);
+  transform: skewX(-20deg); pointer-events: none;
+  transition: left .65s var(--ease-spring);
+}
+.btn.primary:hover::after { left: 130%; }
 .perspective-controls { margin-top: auto; padding-top: 24px; }
 .control-label { display: block; margin-bottom: 9px; color: var(--muted); font-size: 8px; letter-spacing: .12em; }
 .view-buttons { display: grid; gap: 8px; }
 .view-button {
   display: flex; align-items: center; gap: 10px; height: 35px; padding: 0 12px;
   border: 1px solid #8c8f8d; background: var(--card); text-align: left;
-  font-size: 9px; font-weight: 700; transition: background .2s, color .2s, transform .2s, border-color .2s;
+  font-size: 9px; font-weight: 700; transition: background .25s, color .25s, transform .25s var(--ease-spring), border-color .25s;
 }
 .view-button:hover { transform: translateX(3px); background: var(--hair); }
+.view-button:active { transform: translateX(3px) scale(.96); transition-duration: .12s; }
 .view-button.is-active { color: var(--card); border-color: var(--rule); background: var(--rule); }
 .view-icon { width: 12px; font-size: 14px; line-height: 1; letter-spacing: 0; }
 
 /* ---------- art panel (.archive-art) ---------- */
 .archive-art {
-  position: relative; overflow: hidden; min-height: 100%; perspective: 900px;
+  position: relative; overflow: hidden; overflow: clip; min-height: 100%; perspective: 900px;
+  padding: clamp(10px, 3%, 26px);
   background: radial-gradient(circle at 55% 47%, #fff 0 30%, var(--paper-2) 62%, var(--paper) 100%);
   transform: rotateX(var(--pointer-y, 0deg)) rotateY(var(--pointer-x, 0deg));
-  transition: transform .6s cubic-bezier(.2,.8,.2,1);
+  transition: transform .6s var(--ease-spring);
+  will-change: transform;
 }
 .archive-art::before {
   position: absolute; inset: 0; content: ''; pointer-events: none; opacity: .35;
   background-image: linear-gradient(90deg, transparent 49.8%, rgba(0,0,0,.035) 50%, transparent 50.2%);
   background-size: 70px 100%;
+}
+.archive-art::after {
+  position: absolute; inset: 0; content: ''; pointer-events: none; z-index: 1;
+  opacity: 0; transition: opacity .4s;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,.65), transparent 70%);
+  mix-blend-mode: soft-light;
+}
+@media (hover: hover) and (pointer: fine) {
+  .archive-art:hover::after { opacity: 1; }
 }
 .orbit-line {
   position: absolute; width: 120%; height: 54%; left: -8%;
@@ -183,19 +216,27 @@ nav.is-stuck { transform: none; }
 .cover-stack {
   position: absolute; width: min(28%, 186px); aspect-ratio: .69;
   top: 50%; left: 50%;
+  /* container queries let every cover's type/rules scale with the CARD,
+     not the viewport — the design stays proportional at any book count */
+  container-type: inline-size;
   transform: translate(calc(-50% - var(--stack-shift-x, 39px)), calc(-50% + var(--stack-shift-y, 20px))) rotate(-5deg);
-  transition: transform .8s cubic-bezier(.2,.8,.2,1), width .5s, aspect-ratio .5s;
+  transition: transform .8s var(--ease-spring), width .5s var(--ease-spring), aspect-ratio .5s;
   transform-style: preserve-3d;
+  will-change: transform;
 }
 .magazine-cover {
   position: absolute; width: 100%; height: 100%;
   padding: 11px 10px 12px; display: flex; flex-direction: column; justify-content: space-between;
   border: 1px solid var(--rule);
   box-shadow: -2px 2px 0 var(--rule), 7px 8px 13px rgba(0,0,0,.13);
+  /* hard containment: inner grids can never spill past the card edge,
+     however small the card gets on narrow panels */
+  overflow: hidden; min-width: 0; min-height: 0;
   transform: translate3d(calc(var(--i) * var(--stack-step-x, 14px)), calc(var(--i) * var(--stack-step-y, -7px)), calc(var(--i) * var(--stack-step-z, 10px))) rotate(calc(var(--i) * .6deg));
   transform-origin: bottom left;
-  transition: transform .45s cubic-bezier(.2,.8,.2,1), filter .45s, opacity .45s;
-  text-align: left;
+  transition: transform .5s var(--ease-spring), filter .4s ease, opacity .4s ease;
+  text-align: left; will-change: transform;
+  -webkit-font-smoothing: antialiased;
 }
 /* depth scale is the stacked-view perspective cue only — traditional and
    globe reuse the same --i cascade for layout, not depth, so their covers must
@@ -208,7 +249,7 @@ nav.is-stuck { transform: none; }
 }
 @media (hover: hover) and (pointer: fine) {
   #archiveArt[data-view='stacked'] .magazine-cover:hover {
-    transform: translate3d(calc(var(--i) * var(--stack-step-x, 14px)), calc(var(--i) * var(--stack-step-y, -7px) - 20px), calc(var(--i) * var(--stack-step-z, 10px) + 30px)) rotate(-2deg) scale(1.06);
+    transform: translate3d(calc(var(--i) * var(--stack-step-x, 14px)), calc(var(--i) * var(--stack-step-y, -7px) - var(--hover-lift, 20px)), calc(var(--i) * var(--stack-step-z, 10px) + 30px)) rotate(-2deg) scale(1.06);
     z-index: 20; filter: saturate(1.15); opacity: 1;
   }
   #archiveArt[data-view='traditional'] .magazine-cover:hover,
@@ -217,18 +258,36 @@ nav.is-stuck { transform: none; }
   }
 }
 .cover-top, .cover-mark { font-family: var(--serif); font-size: 8px; letter-spacing: .08em; }
+.cover-top, .cover-mark {
+  /* fallback first (no container-query support), fluid override second */
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .magazine-cover strong, .expanded-cover strong {
   font-family: var(--serif); font-size: clamp(12px, 1.5vw, 18px); font-weight: 700;
-  letter-spacing: -.08em; line-height: .8; text-align: center;
+  letter-spacing: -.08em; line-height: .95; text-align: center;
+  min-width: 0; overflow-wrap: break-word; text-wrap: balance;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 .cover-art {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px;
   align-items: center; justify-items: center; padding: 13px 3px;
   border-top: 1px solid currentColor; border-bottom: 1px solid currentColor;
   font-family: var(--serif); font-size: clamp(18px, 2.6vw, 36px); line-height: .7;
+  min-width: 0;
 }
-.cover-art i { display: grid; place-items: center; width: 100%; aspect-ratio: 1; border: 1px solid currentColor; font-style: normal; }
+.cover-art i { display: grid; place-items: center; width: 100%; min-width: 0; max-width: 100%; aspect-ratio: 1; border: 1px solid currentColor; font-style: normal; overflow: hidden; }
 .cover-mark { text-align: center; }
+
+/* Fluid cover type: everything inside a cover scales with the CARD (cqw),
+   not the viewport — hairlines, icon boxes and titles stay proportional
+   from 240px desktop cards down to 90px phone cards. Placed after the
+   fallback rules so it wins in supporting browsers. */
+@supports (font-size: 1cqw) {
+  .magazine-cover { padding: 9cqw 8cqw 10cqw; }
+  .magazine-cover .cover-top, .magazine-cover .cover-mark { font-size: 6.4cqw; letter-spacing: .07em; }
+  .magazine-cover strong { font-size: 11cqw; }
+  .magazine-cover .cover-art { gap: 4.5cqw; padding: 11cqw 2.5cqw; font-size: 19cqw; }
+}
 
 .palette-cream  { color: #1a1a18; background: #f0edc8; }
 .palette-coral  { color: #162532; background: #e87867; }
@@ -250,8 +309,11 @@ nav.is-stuck { transform: none; }
 /* ---------- view: stacked (default — no override needed, matches reference) ---------- */
 
 /* ---------- view: traditional ---------- */
+/* NOTE: column count is adaptive now (JS sets --col/--row per cover:
+   ≤460px art → 3 cols, ≤720px → 4 cols, else 5). The fallback width below
+   is only for no-JS: small enough to never clip the panel. */
 #archiveArt[data-view='traditional'] .cover-stack {
-  width: var(--trad-w, min(66%, 450px)); top: 50%; left: 50%;
+  width: var(--trad-w, min(40%, 200px)); top: 50%; left: 50%;
   transform: translate(calc(-50% - (var(--trad-cols, 1) - 1) * 11.5%), calc(-50% - (var(--trad-rows, 1) - 1) * 57.5%)) rotate(0);
 }
 #archiveArt[data-view='traditional'] .magazine-cover {
@@ -263,10 +325,12 @@ nav.is-stuck { transform: none; }
    ========================================================================= */
 .expanded-card {
   position: absolute; inset: 8% 7%; display: flex; align-items: center; justify-content: center;
-  gap: clamp(20px, 4vw, 70px); padding: 32px; background: rgba(255,255,255,.96);
+  gap: clamp(20px, 4vw, 70px); padding: 32px; background: rgba(255,255,255,.72);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5); backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid rgba(23,23,23,.08); box-shadow: 0 30px 70px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.6);
   opacity: 0; pointer-events: none; transform: scale(.94) translateY(16px);
-  transition: opacity .45s, transform .55s cubic-bezier(.2,.8,.2,1); z-index: 30;
-  overflow-y: auto;
+  transition: opacity .4s ease, transform .6s var(--ease-spring); z-index: 30;
+  overflow-y: auto; will-change: transform, opacity;
 }
 .expanded-card.is-visible { opacity: 1; pointer-events: auto; transform: none; }
 .expanded-cover {
@@ -307,13 +371,17 @@ nav.is-stuck { transform: none; }
   padding: 0 0 5px; border-bottom: 1px solid var(--ink); font-size: 10px;
   text-transform: uppercase; letter-spacing: .1em;
 }
-.text-button span { display: inline-block; margin-left: 12px; transition: transform .2s; }
+.text-button span { display: inline-block; margin-left: 12px; transition: transform .25s var(--ease-spring); }
 .text-button:hover span { transform: translate(3px, -3px); }
+.text-button:active span { transform: translate(1px, -1px) scale(.9); }
 .close-expanded {
   position: absolute; top: 16px; right: 20px; width: 30px; height: 30px; color: #555;
-  font-size: 26px; line-height: 1; opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 35;
+  font-size: 26px; line-height: 1; opacity: 0; pointer-events: none;
+  transition: opacity .3s, transform .25s var(--ease-spring), color .2s; z-index: 35;
 }
 .close-expanded.is-visible { opacity: 1; pointer-events: auto; }
+.close-expanded:hover { color: var(--ink); transform: rotate(90deg); }
+.close-expanded:active { transform: rotate(90deg) scale(.85); }
 .archive-frame.is-expanded .cover-stack { opacity: .1; filter: grayscale(1); pointer-events: none; }
 .archive-frame.is-expanded .orbit-line,
 .archive-frame.is-expanded .drag-hint { opacity: 0; }
@@ -356,7 +424,7 @@ h3.sub code { font-family: var(--mono); font-size: 12.5px; font-style: normal; c
 .card {
   padding: 22px 22px 24px; background: var(--card); border: 1px solid var(--rule);
   box-shadow: -2px 2px 0 rgba(23,23,23,.13);
-  transition: box-shadow .25s cubic-bezier(.2,.8,.2,1), transform .25s cubic-bezier(.2,.8,.2,1);
+  transition: box-shadow .3s var(--ease-spring), transform .3s var(--ease-spring);
 }
 .card:hover { box-shadow: -5px 5px 0 var(--rule); transform: translate(3px, -3px); }
 .card .icon { display: block; margin-bottom: 14px; color: var(--muted); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
@@ -403,9 +471,10 @@ code { font-family: var(--mono); font-size: .84em; color: var(--ink); background
 .copy-btn {
   padding: 3px 9px; border: 1px solid var(--rule); background: var(--card);
   font-family: var(--sans); font-size: 8px; letter-spacing: .11em; text-transform: uppercase;
-  transition: background .2s, color .2s;
+  transition: background .2s, color .2s, transform .15s var(--ease-spring);
 }
 .copy-btn:hover { background: var(--hair); }
+.copy-btn:active { transform: scale(.92); }
 .copy-btn.done { color: var(--card); background: var(--rule); }
 
 .transcript { margin-bottom: 30px; background: var(--card); border: 1px solid var(--rule); box-shadow: -2px 2px 0 rgba(23,23,23,.13); overflow: hidden; }
@@ -609,7 +678,7 @@ footer { margin-top: 24px; padding: 42px clamp(20px, 4vw, 70px) 54px; border-top
 .foot-note a:hover { border-bottom-color: var(--ink); }
 
 /* ---------- reveal ---------- */
-.reveal { opacity: 0; transform: translateY(14px); transition: opacity .55s ease, transform .55s ease; }
+.reveal { opacity: 0; transform: translateY(14px) scale(.99); transition: opacity .6s ease, transform .6s var(--ease-spring); }
 .reveal.visible { opacity: 1; transform: none; }
 
 /* =========================================================================
@@ -642,20 +711,26 @@ footer { margin-top: 24px; padding: 42px clamp(20px, 4vw, 70px) 54px; border-top
   .rail-cta { position: static; width: auto; margin-top: 16px; }
   .rail-cta .btn { height: 34px; }
   .perspective-controls { width: auto; margin-top: 0; padding-top: 16px; }
-  .view-buttons { grid-template-columns: repeat(3, 1fr); gap: 4px; }
-  .view-button { justify-content: center; height: 32px; padding: 0 4px; font-size: 0; }
-  .view-button .view-icon { width: auto; font-size: 15px; }
-  .archive-art { height: 100%; min-height: 440px; }
+  .view-buttons { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  /* keep labels readable on phones: tiny two-line buttons, never icon-only */
+  .view-button { justify-content: center; height: auto; min-height: 40px; padding: 6px 4px; font-size: 7px; line-height: 1.4; letter-spacing: .08em; text-align: center; flex-wrap: wrap; gap: 4px; }
+  .view-button .view-icon { width: auto; font-size: 13px; }
+  .archive-art { height: 100%; min-height: 440px; --hover-lift: 10px; }
   .cover-stack { width: 32%; min-width: 118px; top: 50%; left: 50%; }
   /* the 118px floor above is for the stacked/globe fan only — traditional's
-     width is solved dynamically per viewport/book-count in JS and must not
+     width is solved dynamically per viewport/book-count/columns in JS and must not
      be clamped upward, or extra rows push back off the bottom of the panel */
-  #archiveArt[data-view='traditional'] .cover-stack { width: var(--trad-w, min(66%, 450px)); min-width: 0; top: 50%; left: 50%; }
+  #archiveArt[data-view='traditional'] .cover-stack { width: var(--trad-w, min(40%, 200px)); min-width: 0; top: 50%; left: 50%; }
   .expanded-card { inset: 24% 5% 12%; gap: 16px; padding: 18px; }
   .expanded-cover { flex-basis: 40%; padding: 9px 8px; }
   .expanded-copy h2 { font-size: 42px; }
   .expanded-quote { font-size: 12px; }
-  .signal-row { grid-template-columns: 108px 1fr 30px; }
+  .signal-row {
+    grid-template-columns: 1fr 30px; grid-template-areas: "name name" "bar val"; row-gap: 4px;
+  }
+  .signal-row .sig-name { grid-area: name; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .signal-row .sig-bar { grid-area: bar; }
+  .signal-row .sig-val { grid-area: val; }
   .drag-hint { right: 14px; bottom: 26px; }
   .stage-bottomline span:last-child { display: none; }
   section { padding-top: 62px; }

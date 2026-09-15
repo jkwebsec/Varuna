@@ -33,12 +33,11 @@ var BOOKS = [
     id: "account", kind: "component", palette: "orange",
     top: "03", title: "Account Farm", figure: "◉", mark: "ACCOUNT_RISK_SCORE",
     kicker: "Backend · pipeline stage 3 of 6", headline: "1.00", tag: "component", tagLabel: "backend component",
-    description: "Every comment's author_channel_id is aggregated across the fetched set: total comment volume, distinct videos commented on, and the ratio of unique text to total comments. The four conditions stack — a repeat poster who copy-pastes across multiple videos can hit the 1.0 cap easily.",
+    description: "Every comment's author_channel_id is aggregated on this one video: total comment volume and the ratio of unique text to total comments. The conditions stack — a repeat poster who copy-pastes hits the 1.0 cap fast.",
     facts: [
-      "videos_commented ≥ 3 → +0.40 · == 2 → +0.20",
-      "total_comments ≥ 10 → +0.25 · ≥ 5 → +0.15",
-      "unique_text_ratio ≤ 0.40 → +0.25 · ≤ 0.70 → +0.10",
-      "url_ratio ≥ 0.40 → +0.20"
+      "total_comments ≥ 10 → +0.35 · ≥ 5 → +0.20",
+      "unique_text_ratio ≤ 0.40 → +0.30",
+      "capped at 1.0 · missing channel id → 0.0"
     ]
   },
   {
@@ -199,33 +198,66 @@ BOOKS.forEach(function (book, index) {
   stack.append(button);
 });
 
+/* ---- adaptive traditional grid --------------------------------------------
+   Fixed 5 columns squeeze cards to illegible 70px slivers on phones while
+   their inner content (icon glyphs, hairline rules) keeps fixed minimums —
+   the icons then burst out of the card (the reported mobile bug). So the
+   column count follows the panel: ≤460px → 3 cols, ≤720px → 4, else 5. */
+function tradColsFor(artWidth) {
+  if (artWidth <= 460) return 3;
+  if (artWidth <= 720) return 4;
+  return 5;
+}
+
+function layoutTraditionalGrid() {
+  var artRect = archiveArt.getBoundingClientRect();
+  var cols = tradColsFor(artRect.width || 800);
+  var covers = stack.children;
+  for (var k = 0; k < covers.length; k++) {
+    covers[k].style.setProperty("--col", String(k % cols));
+    covers[k].style.setProperty("--row", String(Math.floor(k / cols)));
+  }
+  return cols;
+}
+
 /* ---- traditional view: size the cascade so every row stays inside the
    panel, however many books there are and however small the viewport is.
-   Same transform formula as the reference (mod 5 columns × 23%, floor/5
-   rows × 115%, translate3d) — only the container's own width is solved for,
-   which in turn sets card height via the fixed .69 aspect ratio.
+   Same transform formula as the reference (col × 23%, row × 115%,
+   translate3d) — only the container's own width is solved for, which in
+   turn sets card height via the fixed .69 aspect ratio.
 
-   The container is vertically/horizontally centered on its OWN single-card
-   box (top:50%/left:53%), but the cascade only grows down-and-right from
-   that box by (rows-1)*115% / (cols-1)*23% of a card's own size — so the
-   true rendered bounds are asymmetric around the anchor, not the box. Solve
-   for the largest card size whose worst-case bound still lands inside the
-   panel. (At the reference's own hardcoded min(66%,450px), even its
-   original 10-cover/2-row case overflows most panel heights — this
-   generalizes correctly instead of copying that fragile constant.) */
+   The container is centered on its OWN single-card box, but the cascade
+   only grows down-and-right from that box — so the largest card size whose
+   worst-case bound still lands inside the panel is solved for. Floor is
+   92px: below that glyphs get cramped, so instead the panel grows taller
+   (minHeight below) and readability wins over fitting a short box. */
 function sizeTraditionalView() {
   if (currentView !== "traditional") return;
   var n = BOOKS.length;
-  var rows = Math.ceil(n / 5);
-  var cols = Math.min(5, n);
   var artRect = archiveArt.getBoundingClientRect();
   if (!artRect.width || !artRect.height) return;
+  var cols = Math.min(layoutTraditionalGrid(), n);
+  var rows = Math.ceil(n / cols);
   var aspect = 0.69;
+  var narrow = artRect.width < 520;
+  /* narrow panels: pack tighter (0.80 fill) and cap cards at 100px —
+     a 13-cover grid is inherently tall on phones; this keeps the panel
+     near ~2 phone screens instead of ~3 while staying readable */
+  var fill = narrow ? 0.80 : 0.62;
+  var cap = narrow ? 100 : 760;
   var vDenom = 0.5 + (rows - 1) * 1.15;
-  var wByHeight = (artRect.height * 0.62 / vDenom) * aspect;
+  var wByHeight = (artRect.height * fill / vDenom) * aspect;
   var hDenom = 0.5 + Math.max(0, cols - 1) * 0.23;
   var wByWidth = artRect.width * 0.6 / hDenom;
-  var w = Math.max(70, Math.min(wByHeight, wByWidth, 760));
+  var w = Math.min(wByHeight, wByWidth, cap);
+  if (w < 92) {
+    w = Math.min(narrow ? 100 : 120, (artRect.width * 0.72) / hDenom, cap);
+    var needH = Math.ceil(((w / aspect) * vDenom) / fill + 40);
+    archiveArt.style.minHeight = Math.max(artRect.height, needH) + "px";
+  } else {
+    archiveArt.style.minHeight = "";
+  }
+  w = Math.max(64, w);
   stack.style.setProperty("--trad-w", w + "px");
   stack.style.setProperty("--trad-cols", String(cols));
   stack.style.setProperty("--trad-rows", String(rows));
@@ -243,10 +275,16 @@ function sizeStackedView() {
   var artRect = archiveArt.getBoundingClientRect();
   var cardRect = stack.getBoundingClientRect();
   if (!artRect.width || !cardRect.width) return;
-  var budget = artRect.width * 0.3;
-  var stepX = Math.max(4, Math.min(14, budget / Math.max(n - 1, 1)));
+  /* reserve the card itself plus breathing room: the old fixed 0.3 budget
+     ignored card width, so on narrow panels card + cascade clipped right */
+  var pad = 28;
+  var budgetX = Math.max(0, artRect.width - cardRect.width * 1.18 - pad);
+  var stepX = Math.max(4, Math.min(14, budgetX / Math.max(n - 1, 1)));
   var ratio = stepX / 14;
   var stepY = 7 * ratio;
+  /* cap the total vertical rise so the back of the fan never leaves the top */
+  var maxRise = artRect.height * 0.30;
+  if (stepY * (n - 1) > maxRise) stepY = Math.max(2, maxRise / Math.max(n - 1, 1));
   var stepZ = 10 * ratio;
   stack.style.setProperty("--stack-step-x", stepX + "px");
   stack.style.setProperty("--stack-step-y", "-" + stepY + "px");
@@ -271,8 +309,10 @@ function sizeGlobeView() {
   var budget = artRect.width * 0.36 - cardRect.width * 0.75;
   var step = Math.max(4, Math.min(33, budget / Math.max(center, 1)));
   var ratio = step / 33;
+  /* cap arc height to short panels so top/bottom covers never clip */
+  var amp = Math.min(45 * ratio, artRect.height * 0.14);
   stack.style.setProperty("--globe-step", step + "px");
-  stack.style.setProperty("--globe-amp", (45 * ratio) + "px");
+  stack.style.setProperty("--globe-amp", amp + "px");
   stack.style.setProperty("--globe-z", (3 * ratio) + "px");
   stack.style.setProperty("--globe-rot", (7 * ratio) + "deg");
 }
@@ -357,6 +397,9 @@ document.querySelectorAll(".view-button").forEach(function (button) {
     if (!archiveFrame.classList.contains("is-expanded")) {
       selectionLabel.textContent = VIEW_LABELS[view];
     }
+    /* traditional grows the panel (minHeight) on short screens — release it
+       when leaving so stacked/globe re-center in the natural panel */
+    if (view !== "traditional") archiveArt.style.minHeight = "";
     if (view === "traditional") sizeTraditionalView();
     if (view === "globe") sizeGlobeView();
     if (view === "stacked") sizeStackedView();
@@ -364,6 +407,7 @@ document.querySelectorAll(".view-button").forEach(function (button) {
 });
 
 window.addEventListener("resize", function () { sizeTraditionalView(); sizeGlobeView(); sizeStackedView(); }, { passive: true });
+layoutTraditionalGrid();
 sizeStackedView();
 
 /* ---- pointer parallax — fine pointers only, never on touch/coarse ------ */
@@ -374,6 +418,8 @@ archiveArt.addEventListener("pointermove", function (event) {
   var y = (event.clientY - bounds.top) / bounds.height - 0.5;
   archiveArt.style.setProperty("--pointer-x", (x * 5) + "deg");
   archiveArt.style.setProperty("--pointer-y", (y * -4) + "deg");
+  archiveArt.style.setProperty("--mx", ((x + 0.5) * 100) + "%");
+  archiveArt.style.setProperty("--my", ((y + 0.5) * 100) + "%");
 });
 archiveArt.addEventListener("pointerleave", function () {
   archiveArt.style.setProperty("--pointer-x", "0deg");
@@ -432,9 +478,18 @@ document.querySelectorAll(".copy-btn").forEach(function (btn) {
 var siteNav = document.querySelector("nav");
 var stageEl = document.querySelector(".stage");
 var navLinks = document.querySelectorAll(".nav-links a");
+var navPill = document.querySelector(".nav-pill");
 var sections = Array.prototype.map.call(navLinks, function (a) {
   return document.querySelector(a.getAttribute("href"));
 });
+
+/* fluid sliding indicator under the active nav link, Apple-tab-bar style */
+function moveNavPill(link) {
+  if (!navPill || !link) return;
+  navPill.style.opacity = "1";
+  navPill.style.transform = "translateX(" + link.offsetLeft + "px)";
+  navPill.style.width = link.offsetWidth + "px";
+}
 
 function onScroll() {
   var trigger = stageEl ? stageEl.offsetHeight * 0.65 : 400;
@@ -445,12 +500,47 @@ function onScroll() {
   sections.forEach(function (sec) {
     if (sec && sec.offsetTop <= pos) current = sec;
   });
+  var activeLink = null;
   navLinks.forEach(function (a) {
-    a.classList.toggle("active", current && a.getAttribute("href") === "#" + current.id);
+    var isActive = current && a.getAttribute("href") === "#" + current.id;
+    a.classList.toggle("active", isActive);
+    if (isActive) activeLink = a;
   });
+  moveNavPill(activeLink);
 }
 window.addEventListener("scroll", onScroll, { passive: true });
+window.addEventListener("resize", function () { moveNavPill(document.querySelector(".nav-links a.active")); }, { passive: true });
 onScroll();
+
+/* ---- masthead stat counters: count up to value once revealed -------------- */
+function animateCount(el) {
+  var raw = el.textContent.trim();
+  var match = raw.match(/^(\d+)/);
+  if (!match || reduceMotion.matches) return;
+  var target = parseInt(match[1], 10);
+  var suffix = raw.slice(match[1].length);
+  var start = performance.now();
+  var duration = 900;
+  function tick(now) {
+    var t = Math.min(1, (now - start) / duration);
+    var eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(target * eased) + suffix;
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+var mastheadObserver = new IntersectionObserver(
+  function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        animateCount(entry.target);
+        mastheadObserver.unobserve(entry.target);
+      }
+    });
+  },
+  { threshold: 0.6 }
+);
+document.querySelectorAll(".mstat .num").forEach(function (el) { mastheadObserver.observe(el); });
 
 /* ---- reveal on scroll ------------------------------------------------------ */
 var observer = new IntersectionObserver(
