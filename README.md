@@ -5,6 +5,7 @@ risk verdicts + a per-video Authenticity Score — bot-text classifier, account-
 heuristics, scam regexes, and coordination detection fused in one decision ladder.
 
 Live site (GitHub Pages): `https://jkwebsec.github.io/Varuna/`
+Live app (Streamlit): `https://varunajk.streamlit.app/`
 
 ## Run it (2 commands)
 
@@ -40,13 +41,10 @@ GitHub Pages only serves static files — it can't run the Python backend.
 For a live, clickable version of the app (not just the local `streamlit run`),
 deploy it free on [Streamlit Community Cloud](https://streamlit.io/cloud):
 sign in with GitHub → **New app** → pick this repo/branch → main file `app.py`
-→ Deploy. You get a public `*.streamlit.app` URL.
+→ Deploy.
 
-The site already has two "Try it live" buttons (hero + Demo section) wired to
-a placeholder — once you have your real URL, find/replace
-`https://YOUR-APP-NAME.streamlit.app` in `index.html` (2 occurrences) with it,
-then `git push`. GitHub Pages picks up the change automatically, no rebuild
-step.
+Live app: **https://varunajk.streamlit.app/** — the site's two "Try it live"
+buttons (hero + Demo section) already point there.
 
 ## Scoring engine (exact thresholds)
 
