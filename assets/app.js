@@ -154,7 +154,7 @@ var VIEW_LABELS = { globe: "Globe perspective", stacked: "Stacked perspective", 
    live / embed, tracking params like ?si= are fine) and the screening
    section rebuilds itself: poster, caption, and embed all follow.
    ========================================================================= */
-var DEMO_VIDEO_URL = "https://youtu.be/lJBcZHzgD7s?si=Ihdq7zJrdDsPh4aP";
+var DEMO_VIDEO_URL = "https://youtu.be/-6gOljCctCw";
 
 
 function esc(s) {
@@ -664,10 +664,8 @@ function loadCinema() {
   }
 
   function destroyPlayer() {
-    if (player) {
-      try { player.destroy(); } catch (e) {}
-      player = null;
-    }
+    if (player && player.parentNode) player.parentNode.removeChild(player);
+    player = null;
     if (hostEl && hostEl.isConnected) {
       try { hostEl.remove(); } catch (e2) {}
     }
@@ -696,59 +694,27 @@ function loadCinema() {
 
   function startPlayback() {
     if (failed) return;
-    ensureHost();
-    var watchdog = setTimeout(function () {
-      if (!player && !failed) showBlocked(2);
-    }, 6000);
-    loadYouTubeAPI(function () {
+    var host = ensureHost();
+    var iframe = document.createElement("iframe");
+    var origin = window.location.origin;
+    var params = "autoplay=1&playsinline=1&rel=0&color=white";
+    if (origin && origin !== "null") params += "&origin=" + encodeURIComponent(origin);
+    iframe.className = "cinema-embed";
+    iframe.src = "https://www.youtube.com/embed/" + encodeURIComponent(id) + "?" + params;
+    iframe.title = "Varuna demonstration video";
+    iframe.setAttribute("allow", "autoplay; encrypted-media; picture-in-picture");
+    iframe.setAttribute("allowfullscreen", "");
+    iframe.referrerPolicy = "strict-origin-when-cross-origin";
+    iframe.addEventListener("load", function () {
       if (failed) return;
-      try {
-        player = new YT.Player(hostEl, {
-          width: "100%",
-          height: "100%",
-          videoId: id,
-          playerVars: { autoplay: 1, playsinline: 1, rel: 0, color: "white" },
-          events: {
-            onReady: function (event) {
-              clearTimeout(watchdog);
-              if (!failed) {
-                var why = 0;
-                try {
-                  var vd = event.target.getVideoData && event.target.getVideoData();
-                  why = vd && vd.video_id ? 0 : 2;
-                } catch (e2) {}
-                if (why === 0) {
-                  try { event.target.playVideo(); } catch (e3) {}
-                  cinema.classList.add("is-playing");
-                  play.style.display = "none";
-                  note.style.display = "none";
-                  if (caption) caption.textContent = "rolling · the full run, start to finish";
-                  if (replayBtn) { replayBtn.hidden = false; replayBtn.disabled = false; }
-                } else {
-                  showBlocked(2);
-                }
-              }
-            },
-            onStateChange: function (event) {
-              if (event.data === YT.PlayerState.PLAYING && cinema && !cinema.classList.contains("is-playing")) {
-                cinema.classList.add("is-playing");
-                play.style.display = "none";
-                note.style.display = "none";
-                if (caption) caption.textContent = "rolling · the full run, start to finish";
-                if (replayBtn) { replayBtn.hidden = false; replayBtn.disabled = false; }
-              }
-            },
-            onError: function (event) {
-              clearTimeout(watchdog);
-              showBlocked(event.data);
-            }
-          }
-        });
-      } catch (err) {
-        clearTimeout(watchdog);
-        showBlocked(2);
-      }
+      cinema.classList.add("is-playing");
+      play.style.display = "none";
+      note.style.display = "none";
+      if (caption) caption.textContent = "rolling · the full run, start to finish";
+      if (replayBtn) { replayBtn.hidden = false; replayBtn.disabled = false; }
     });
+    host.appendChild(iframe);
+    player = iframe;
   }
 
   play.addEventListener("click", startPlayback);
